@@ -17,11 +17,29 @@
       "parentId": "wrk_clickflow",
       "name": "Base Environment",
       "data": {
-        "sequencer_base_url": "https://SEU-HOST-SEQUENCER/api/v1",
-        "runner_base_url": "https://clickflow-runner.clicksign.com/api/v1",
         "access_token": "",
         "flow_id": "",
         "execution_id": ""
+      }
+    },
+    {
+      "_id": "env_sandbox",
+      "_type": "environment",
+      "parentId": "env_base",
+      "name": "Sandbox",
+      "data": {
+        "sequencer_base_url": "https://clickflow-sandbox.clicksign.com/api/v1",
+        "runner_base_url": "https://clickflow-runner-sandbox.clicksign.com/api/v1"
+      }
+    },
+    {
+      "_id": "env_producao",
+      "_type": "environment",
+      "parentId": "env_base",
+      "name": "Produção",
+      "data": {
+        "sequencer_base_url": "https://clickflow.clicksign.com/api/v1",
+        "runner_base_url": "https://clickflow-runner.clicksign.com/api/v1"
       }
     },
     {
@@ -70,7 +88,7 @@
       ],
       "body": {
         "mimeType": "application/json",
-        "text": "{\n  \"name\": \"Onboarding de colaborador\",\n  \"steps\": [\n    { \"type\": \"form\", \"context\": { \"form_id\": \"<id do formulário>\" } },\n    { \"type\": \"verify\", \"context\": { \"authentication\": \"liveness\" } },\n    { \"type\": \"signature\", \"context\": { \"folder_key\": \"<referência do documento>\" } }\n  ]\n}"
+        "text": "{\n  \"name\": \"Onboarding de colaborador\",\n  \"steps\": [\n    { \"type\": \"form\", \"context\": { \"version_key\": \"<version_key do formulário>\" } },\n    { \"type\": \"verify\", \"context\": { \"authentication\": \"liveness\" } },\n    { \"type\": \"signature\", \"context\": { \"folder_key\": \"<referência da pasta>\", \"documents\": [ { \"kind\": \"template\", \"template_key\": \"<uuid do modelo Távola>\", \"filename\": \"contrato.docx\" } ] } }\n  ]\n}"
       }
     },
     {

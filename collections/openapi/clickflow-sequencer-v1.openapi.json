@@ -1,186 +1,295 @@
 {
   "openapi": "3.0.3",
   "info": {
-    "title": "ClickFlow Sequencer API",
-    "description": "Orquestrador do ClickFlow. Guarda a definição de cada Flow e o estado de cada Execution; decide o próximo passo. Não executa módulos e não conhece o canal de entrega — isso é responsabilidade do Runner (ver clickflow-runner-v1.openapi.json).",
-    "version": "1.0.0"
+    "title": "ClickFlow Orchestrator API",
+    "version": "1.0",
+    "description": "### Visão geral\n\nO ClickFlow Orchestrator é o serviço central responsável pelo estado e pela sequência linear de jornadas transacionais, composta por módulos desacoplados: WhatsApp, Formulários, Verificação e Assinatura.\n\n### Persistência e responsabilidades\n\nA orquestração é exposta como serviço stateless; o estado autoritativo fica em Amazon DynamoDB. A API separa claramente duas frentes de operação:\n\n- Flows — definição estrutural da jornada: ordem dos steps e o contexto associado a cada etapa.\n- Executions — instâncias em execução: criação, transição entre steps e rastreamento do progresso em tempo real.\n\n### Autenticação e Segurança\n\nTodos os recursos da rota `/api/v1` exigem autenticação. Envie o cabeçalho `Authorization` contendo exclusivamente o UUID do token (sem prefixo `Bearer`).\n\n---\nSpec extraído do endpoint de documentação viva do serviço (`/api/v1/docs/doc.json`) em 07/07/2026. `servers` abaixo foram adicionados por este repositório — não fazem parte do spec original.",
+    "contact": { "name": "Clicksign — ClickFlow" }
   },
   "servers": [
-    { "url": "{sequencer_base_url}", "variables": { "sequencer_base_url": { "default": "https://SEU-HOST-SEQUENCER/api/v1" } } }
+    { "url": "https://clickflow-sandbox.clicksign.com/api/v1", "description": "Sandbox — use este ambiente para testes" },
+    { "url": "https://clickflow.clicksign.com/api/v1", "description": "Produção" }
   ],
-  "security": [{ "AuthorizationToken": [] }],
+  "security": [{ "ApiKeyAuth": [] }],
   "tags": [
-    { "name": "Flows" },
-    { "name": "Executions" },
-    { "name": "Health" }
+    { "name": "flows" },
+    { "name": "executions" },
+    { "name": "health" }
   ],
   "paths": {
     "/flows": {
       "get": {
-        "tags": ["Flows"],
+        "tags": ["flows"],
         "summary": "Lista flows",
         "responses": {
-          "200": {
-            "description": "Lista de flows",
-            "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Flow" } } } }
-          }
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/domain.Flow" } } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/handler.ErrorUnauthorizedResponse" } } } },
+          "503": { "description": "Service Unavailable", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/handler.ErrorResponse" } } } }
         }
       },
       "post": {
-        "tags": ["Flows"],
-        "summary": "Cria um flow (status draft)",
+        "tags": ["flows"],
+        "summary": "Cria flow (draft)",
+        "description": "account e user_id vêm do token (Authorization), via introspecção em AUTH_URL — não do body. Validação estrutural do context `acceptance` (template_key, accept_replies) no orquestrador; match da resposta do usuário no runner. Validação do contexto do passo `signature` ocorre no executor (runner).",
         "requestBody": {
           "required": true,
-          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/FlowCreateRequest" }, "example": { "name": "Onboarding de colaborador", "steps": [ { "type": "form", "context": { "form_id": "<id do formulário>" } }, { "type": "verify", "context": { "authentication": "liveness" } }, { "type": "signature", "context": { "folder_key": "<referência do documento>" } } ] } } }
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/handler.CreateFlowBody" },
+              "examples": {
+                "acceptance": { "summary": "Acceptance", "value": { "name": "Proposta Crédito — acceptance", "steps": [ { "type": "acceptance", "context": { "template_key": "chave-do-template", "accept_replies": ["accept", "aceitar"] } } ] } },
+                "form": { "summary": "Form", "value": { "name": "Proposta Crédito — form", "steps": [ { "type": "form", "context": { "version_key": "sua-form-version-key" } } ] } },
+                "form_contact": { "summary": "Form — atualização de contato", "value": { "name": "Proposta Crédito — form com atualização de contato", "steps": [ { "type": "form", "context": { "version_key": "a0cfcec8-4d18-49a8-b6d1-85df293d5cb4", "contact": { "person_name": "...", "person_documentation": "...", "person_birthday": "...", "phone_number": "..." } } } ] } },
+                "form_forward_fill": { "summary": "Form — injeção de respostas de formulários anteriores", "value": { "name": "Injeção de respostas de formulários anteriores", "steps": [ { "type": "form", "context": { "version_key": "versao-formulario-cadastro" } }, { "type": "form", "context": { "version_key": "versao-formulario-confirmacao", "context_map_keys": { "nome-completo-confirmacao": { "read_only": false, "value": "nome-completo-cadastro" }, "email-confirmacao": { "read_only": true, "value": "email-cadastro" }, "whatsapp-confirmacao": { "read_only": true, "value": "whatsapp-cadastro" }, "campo-destino-formulario-atual": { "read_only": false, "value": "campo-origem" } } } } ] } },
+                "form_forward_fill_contact": { "summary": "Form — injeção do contato no formulário", "value": { "name": "Injeção do contato no formulário", "steps": [ { "type": "form", "context": { "version_key": "versao-formulario-confirmacao", "context_map_keys": { "nome-completo": { "read_only": true, "value": "{{person_name}}" }, "cpf": { "read_only": true, "value": "{{person_documentation}}" }, "data-nascimento": { "read_only": true, "value": "{{person_birthday}}" }, "whatsapp": { "read_only": true, "value": "{{phone_number}}" } } } } ] } },
+                "verify": { "summary": "Verify — liveness", "value": { "name": "Proposta Crédito — verify", "steps": [ { "type": "verify", "context": { "authentication": "liveness" } } ] } },
+                "verify_biometric_behavior": { "summary": "Verify — biometric_behavior", "value": { "name": "Proposta Crédito — verify biometric_behavior", "steps": [ { "type": "verify", "context": { "authentication": "biometric_behavior" } } ] } },
+                "verify_biometric_behavior_with_form": { "summary": "Verify — biometric_behavior + form", "value": { "name": "Proposta Crédito — verify biometric_behavior + form", "steps": [ { "type": "form", "context": { "version_key": "sua-form-version-key" } }, { "type": "verify", "context": { "authentication": "biometric_behavior", "contact_fields_map": { "person_name": "field-key-do-nome", "person_documentation": "field-key-do-documento" } } } ] } },
+                "signature_file": { "summary": "Signature — arquivo S3", "value": { "name": "Proposta Crédito", "steps": [ { "type": "signature", "context": { "folder_key": "1fb29ab8-84c4-4856-be37-5fce0f17c11a", "documents": [ { "kind": "file", "s3_bucket": "meu-bucket", "s3_key": "caminho/para/contrato.pdf", "filename": "contrato-proposta.pdf" } ] } } ] } },
+                "signature_template": { "summary": "Signature — modelo Távola", "value": { "name": "Proposta Crédito — template", "steps": [ { "type": "signature", "context": { "folder_key": "1fb29ab8-84c4-4856-be37-5fce0f17c11a", "documents": [ { "kind": "template", "template_key": "uuid-do-modelo-tavola", "filename": "contrato-proposta.docx" } ] } } ] } },
+                "signature_mixed": { "summary": "Signature — arquivo S3 + modelo Távola", "value": { "name": "Proposta Crédito — arquivo S3 + template", "steps": [ { "type": "signature", "context": { "folder_key": "1fb29ab8-84c4-4856-be37-5fce0f17c11a", "documents": [ { "kind": "file", "s3_bucket": "meu-bucket", "s3_key": "caminho/para/anexo.pdf", "filename": "anexo.pdf" }, { "kind": "template", "template_key": "uuid-do-modelo-tavola", "filename": "contrato.docx" } ] } } ] } },
+                "signature_filename_interpolado": { "summary": "Signature — filename com interpolação", "value": { "name": "Proposta Crédito — form + signature com filename", "steps": [ { "type": "form", "context": { "version_key": "sua-form-version-key" } }, { "type": "signature", "context": { "folder_key": "1fb29ab8-84c4-4856-be37-5fce0f17c11a", "documents": [ { "kind": "template", "template_key": "uuid-do-modelo-tavola", "filename": "doc_{{person_name}}_{{field-key-do-version}}.docx" } ] } } ] } }
+              }
+            }
+          }
         },
         "responses": {
-          "201": { "description": "Flow criado em draft", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Flow" } } } }
+          "201": { "description": "Created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/domain.Flow" } } } },
+          "400": { "description": "Bad Request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/handler.ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/handler.ErrorUnauthorizedResponse" } } } },
+          "503": { "description": "Service Unavailable", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/handler.ErrorResponse" } } } }
         }
       }
     },
     "/flows/{id}": {
-      "parameters": [ { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } } ],
+      "parameters": [ { "name": "id", "in": "path", "required": true, "description": "Flow ID", "schema": { "type": "string" } } ],
       "get": {
-        "tags": ["Flows"],
-        "summary": "Obtém um flow por ID",
+        "tags": ["flows"],
+        "summary": "Obtém flow por ID",
         "responses": {
-          "200": { "description": "Flow encontrado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Flow" } } } },
-          "404": { "description": "Flow não encontrado" }
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/domain.Flow" } } } },
+          "400": { "description": "Bad Request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/handler.ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/handler.ErrorUnauthorizedResponse" } } } },
+          "404": { "description": "Not Found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/handler.ErrorResponse" } } } }
         }
       },
       "put": {
-        "tags": ["Flows"],
-        "summary": "Atualiza um flow (somente enquanto draft)",
-        "description": "`account` e `user_id` são preservados do recurso persistido e ignorados se enviados no body. Retorna 403 se o flow não estiver em draft.",
+        "tags": ["flows"],
+        "summary": "Atualiza flow",
+        "description": "Envia tipicamente name e steps. account e user_id são preservados do recurso persistido (ignorados no body). Retorna 403 se o flow não estiver em draft — definição imutável após publish.",
         "requestBody": {
           "required": true,
-          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/FlowUpdateRequest" } } }
+          "description": "Campos (ex.: name, steps)",
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/domain.Flow" } } }
         },
         "responses": {
-          "200": { "description": "Flow atualizado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Flow" } } } },
-          "403": { "description": "Flow não está em draft — definição imutável após publish" }
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/domain.Flow" } } } },
+          "400": { "description": "Bad Request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/handler.ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/handler.ErrorUnauthorizedResponse" } } } },
+          "403": { "description": "Forbidden — flow não está em draft", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/handler.ErrorResponse" } } } },
+          "404": { "description": "Not Found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/handler.ErrorResponse" } } } }
         }
       }
     },
     "/flows/{id}/publish": {
-      "parameters": [ { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } } ],
+      "parameters": [ { "name": "id", "in": "path", "required": true, "description": "Flow ID", "schema": { "type": "string" } } ],
       "patch": {
-        "tags": ["Flows"],
-        "summary": "Publica um flow (draft → published)",
+        "tags": ["flows"],
+        "summary": "Publica flow (draft → published)",
         "responses": {
-          "200": { "description": "Flow publicado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Flow" } } } },
-          "409": { "description": "Flow já publicado/arquivado" }
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/domain.Flow" } } } },
+          "400": { "description": "Bad Request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/handler.ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/handler.ErrorUnauthorizedResponse" } } } },
+          "404": { "description": "Not Found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/handler.ErrorResponse" } } } },
+          "409": { "description": "Conflict", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/handler.ErrorResponse" } } } }
         }
       }
     },
     "/flows/{id}/executions": {
-      "parameters": [ { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } } ],
+      "parameters": [ { "name": "id", "in": "path", "required": true, "description": "Flow ID", "schema": { "type": "string" } } ],
       "get": {
-        "tags": ["Executions"],
+        "tags": ["executions"],
         "summary": "Lista execuções de um flow",
         "responses": {
-          "200": { "description": "Lista de execuções", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Execution" } } } } }
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/domain.Execution" } } } } },
+          "400": { "description": "Bad Request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/handler.ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/handler.ErrorUnauthorizedResponse" } } } },
+          "503": { "description": "Service Unavailable", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/handler.ErrorResponse" } } } }
         }
       },
       "post": {
-        "tags": ["Executions"],
+        "tags": ["executions"],
         "summary": "Inicia execução de um flow publicado",
-        "description": "Chamado internamente pelo Runner ao receber POST /flows/{flow_id}/execute — não é o ponto de entrada usado pela empresa integradora. Persiste flow_name e snapshot de account.",
+        "description": "Persiste flow_name e account (snapshot copiado do flow; account.key e account.name vêm da introspecção do token em AUTH_URL). Chamado internamente pelo Runner ao receber POST /flows/{flow_id}/execute — não é o ponto de entrada usado pela empresa integradora (ver clickflow-runner-v1.openapi.json).",
         "responses": {
-          "201": { "description": "Execução criada", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Execution" } } } },
-          "409": { "description": "Flow não está publicado" }
+          "201": { "description": "Created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/handler.ExecutionDetailResponse" } } } },
+          "400": { "description": "Bad Request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/handler.ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/handler.ErrorUnauthorizedResponse" } } } },
+          "404": { "description": "Not Found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/handler.ErrorResponse" } } } }
         }
       }
     },
     "/executions/{execution_id}": {
-      "parameters": [ { "name": "execution_id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } } ],
+      "parameters": [ { "name": "execution_id", "in": "path", "required": true, "description": "Execution ID", "schema": { "type": "string" } } ],
       "get": {
-        "tags": ["Executions"],
-        "summary": "Estado consolidado da execução",
+        "tags": ["executions"],
+        "summary": "Estado da execução",
         "responses": {
-          "200": { "description": "Execução encontrada", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Execution" } } } },
-          "404": { "description": "Execução não encontrada" }
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/handler.ExecutionDetailResponse" } } } },
+          "400": { "description": "Bad Request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/handler.ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/handler.ErrorUnauthorizedResponse" } } } },
+          "404": { "description": "Not Found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/handler.ErrorResponse" } } } }
         }
       }
     },
     "/executions/{execution_id}/next": {
-      "parameters": [ { "name": "execution_id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } } ],
+      "parameters": [ { "name": "execution_id", "in": "path", "required": true, "description": "Execution ID", "schema": { "type": "string" } } ],
       "post": {
-        "tags": ["Executions"],
-        "summary": "Avança a execução para o próximo step",
+        "tags": ["executions"],
+        "summary": "Avança para o próximo passo",
         "responses": {
-          "200": { "description": "Execução avançada", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Execution" } } } },
-          "409": { "description": "Execução não está em um estado que permite avançar" }
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/handler.ExecutionDetailResponse" } } } },
+          "400": { "description": "Bad Request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/handler.ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/handler.ErrorUnauthorizedResponse" } } } },
+          "404": { "description": "Not Found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/handler.ErrorResponse" } } } },
+          "409": { "description": "Conflict", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/handler.ErrorResponse" } } } }
         }
       }
     },
     "/health": {
       "get": {
-        "tags": ["Health"],
+        "tags": ["health"],
         "summary": "Health check",
         "security": [],
-        "responses": { "200": { "description": "Serviço saudável" } }
+        "description": "Sem autenticação. Indica se a aplicação está em pé e pronta para tráfego — valida acesso ao backend de dados configurado para esta API.",
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/handler.HealthOKResponse" } } } },
+          "503": { "description": "Serviço indisponível ou dependência essencial indisponível", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/handler.ErrorResponse" } } } }
+        }
       }
     }
   },
   "components": {
     "securitySchemes": {
-      "AuthorizationToken": {
+      "ApiKeyAuth": {
         "type": "apiKey",
         "in": "header",
         "name": "Authorization",
-        "description": "Token de acesso (UUID), sem prefixo Bearer. Validado por introspecção; retorna user_id e account."
+        "description": "UUID do token no header Authorization (sem Bearer). Validado por introspecção em AUTH_URL — retorna user_id e account (id numérico, key UUID e name)."
       }
     },
     "schemas": {
-      "FlowStep": {
+      "domain.Account": {
         "type": "object",
-        "required": ["type", "context"],
         "properties": {
-          "type": { "type": "string", "enum": ["acceptance", "form", "verify", "signature"] },
-          "context": { "type": "object", "description": "Schema livre, específico por tipo — ver docs/02-conceitos-e-modelo-de-dados.md" }
+          "id": { "type": "integer" },
+          "key": { "type": "string" },
+          "name": { "type": "string" }
         }
       },
-      "Flow": {
+      "domain.FlowStatus": {
+        "type": "string",
+        "enum": ["draft", "published", "archived"],
+        "x-enum-varnames": ["FlowStatusDraft", "FlowStatusPublished", "FlowStatusArchived"]
+      },
+      "domain.FlowStepType": {
+        "type": "string",
+        "enum": ["acceptance", "form", "verify", "signature"],
+        "x-enum-varnames": ["FlowStepTypeAcceptance", "FlowStepTypeForm", "FlowStepTypeVerify", "FlowStepTypeSignature"]
+      },
+      "domain.FlowStep": {
+        "type": "object",
+        "required": ["context"],
+        "properties": {
+          "type": { "$ref": "#/components/schemas/domain.FlowStepType" },
+          "context": { "type": "object", "additionalProperties": true, "description": "Schema livre por tipo — ver exemplos em POST /flows e docs/02-conceitos-e-modelo-de-dados.md" }
+        }
+      },
+      "domain.Flow": {
         "type": "object",
         "properties": {
-          "flow_id": { "type": "string", "format": "uuid" },
+          "flow_id": { "type": "string" },
           "name": { "type": "string" },
-          "status": { "type": "string", "enum": ["draft", "published", "archived"] },
-          "steps": { "type": "array", "items": { "$ref": "#/components/schemas/FlowStep" } },
-          "account": { "type": "object", "properties": { "id": { "type": "integer" }, "key": { "type": "string", "format": "uuid" }, "name": { "type": "string" } } },
+          "status": { "$ref": "#/components/schemas/domain.FlowStatus" },
+          "steps": { "type": "array", "items": { "$ref": "#/components/schemas/domain.FlowStep" } },
+          "account": { "$ref": "#/components/schemas/domain.Account" },
           "user_id": { "type": "string" },
-          "created_at": { "type": "string", "format": "date-time" },
-          "updated_at": { "type": "string", "format": "date-time" }
+          "created_at": { "type": "string" },
+          "updated_at": { "type": "string" }
         }
       },
-      "FlowCreateRequest": {
-        "type": "object",
-        "required": ["name", "steps"],
-        "properties": {
-          "name": { "type": "string" },
-          "steps": { "type": "array", "items": { "$ref": "#/components/schemas/FlowStep" } }
-        }
+      "domain.ExecutionStatus": {
+        "type": "string",
+        "enum": ["running", "waiting", "completed", "failed"],
+        "x-enum-varnames": ["ExecutionStatusRunning", "ExecutionStatusWaiting", "ExecutionStatusCompleted", "ExecutionStatusFailed"],
+        "description": "⚠️ Divergência observada: o spec publicado pelo serviço declara os valores em minúsculo (running/waiting/completed/failed), mas um payload real de produção capturado em 07/07/2026 mostrou o valor em maiúsculo (\"status\": \"RUNNING\"). Não assuma um casing sem checar a resposta real antes de fazer parsing sensível a maiúsculas/minúsculas."
       },
-      "FlowUpdateRequest": {
+      "domain.Execution": {
         "type": "object",
+        "description": "Formato retornado em GET /flows/{id}/executions (lista). Para uma execução individual, os endpoints retornam handler.ExecutionDetailResponse (mais completo — inclui current_step e executed_steps).",
         "properties": {
-          "name": { "type": "string" },
-          "steps": { "type": "array", "items": { "$ref": "#/components/schemas/FlowStep" } }
-        }
-      },
-      "Execution": {
-        "type": "object",
-        "properties": {
-          "execution_id": { "type": "string", "format": "uuid" },
-          "flow_id": { "type": "string", "format": "uuid" },
+          "execution_id": { "type": "string" },
+          "flow_id": { "type": "string" },
           "flow_name": { "type": "string" },
-          "account": { "type": "object", "properties": { "id": { "type": "integer" }, "key": { "type": "string", "format": "uuid" }, "name": { "type": "string" } } },
-          "status": { "type": "string", "enum": ["RUNNING", "WAITING", "COMPLETED", "FAILED"] },
+          "account": { "$ref": "#/components/schemas/domain.Account" },
+          "status": { "$ref": "#/components/schemas/domain.ExecutionStatus" },
           "current_step_index": { "type": "integer" },
-          "created_at": { "type": "string", "format": "date-time" },
-          "updated_at": { "type": "string", "format": "date-time" }
+          "created_at": { "type": "string" },
+          "updated_at": { "type": "string" }
         }
+      },
+      "handler.CreateFlowBody": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string" },
+          "steps": { "type": "array", "items": { "$ref": "#/components/schemas/domain.FlowStep" } }
+        }
+      },
+      "handler.StepResponse": {
+        "type": "object",
+        "properties": {
+          "type": { "type": "string" },
+          "context": { "type": "object", "additionalProperties": true }
+        }
+      },
+      "handler.ExecutedStepResponse": {
+        "type": "object",
+        "properties": {
+          "type": { "type": "string" },
+          "status": { "type": "string" },
+          "step_index": { "type": "integer" },
+          "started_at": { "type": "string" },
+          "finished_at": { "type": "string" }
+        }
+      },
+      "handler.ExecutionDetailResponse": {
+        "type": "object",
+        "properties": {
+          "execution_id": { "type": "string" },
+          "flow_id": { "type": "string" },
+          "flow_name": { "type": "string" },
+          "account": { "$ref": "#/components/schemas/domain.Account" },
+          "status": { "type": "string" },
+          "current_step": { "$ref": "#/components/schemas/handler.StepResponse" },
+          "executed_steps": { "type": "array", "items": { "$ref": "#/components/schemas/handler.ExecutedStepResponse" } },
+          "created_at": { "type": "string" },
+          "updated_at": { "type": "string" }
+        }
+      },
+      "handler.ErrorResponse": {
+        "type": "object",
+        "properties": { "error": { "type": "string" } }
+      },
+      "handler.ErrorUnauthorizedResponse": {
+        "type": "object",
+        "properties": { "error": { "type": "string", "example": "authorization required" } },
+        "example": { "error": "authorization required" }
+      },
+      "handler.HealthOKResponse": {
+        "type": "object",
+        "properties": { "status": { "type": "string", "example": "ok" } },
+        "example": { "status": "ok" }
       }
     }
   }

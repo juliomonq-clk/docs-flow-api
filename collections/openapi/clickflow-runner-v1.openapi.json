@@ -2,128 +2,138 @@
   "openapi": "3.0.3",
   "info": {
     "title": "ClickFlow Runner API",
-    "description": "Executor do ClickFlow. Ponto de entrada usado pela empresa integradora para iniciar uma execução e acompanhar o progresso de uma transação. Aciona os módulos corretos e entrega a experiência ao consumidor final no canal configurado (hoje, WhatsApp).",
-    "version": "1.0.0"
+    "version": "1.0",
+    "description": "### Visão geral\n\nO ClickFlow Runner inicia e acompanha execuções de fluxos conversacionais em nome de um contato. O fluxo é definido no orquestrador; o Runner executa cada etapa e persiste o estado para auditoria.\n\n### Como usar\n\n1. Iniciar uma execução — `POST /api/v1/flows/{flow_id}/execute`. Informe o contato (telefone, nome, etc.) e o Runner inicia o fluxo.\n2. Acompanhar — `GET /api/v1/executions/{execution_id}`. Consulte o status da execução e de cada etapa.\n\n### Autenticação\n\nTodas as rotas exigem o header `Authorization` com o UUID do token (sem prefixo `Bearer`).\n\n---\nConvertido a partir do spec Swagger 2.0 extraído do endpoint de documentação viva do serviço (`/api/v1/docs/doc.json`) em 07/07/2026. `servers` abaixo foram adicionados por este repositório.",
+    "contact": { "name": "Clicksign — ClickFlow" }
   },
   "servers": [
-    { "url": "https://clickflow-runner.clicksign.com/api/v1" }
+    { "url": "https://clickflow-runner-sandbox.clicksign.com/api/v1", "description": "Sandbox — use este ambiente para testes. Observado indisponível (\"no available server\") em 07/07/2026; confirmar com o time técnico antes de depender dele." },
+    { "url": "https://clickflow-runner.clicksign.com/api/v1", "description": "Produção" }
   ],
-  "security": [{ "AuthorizationToken": [] }],
+  "security": [{ "ApiKeyAuth": [] }],
   "tags": [
-    { "name": "Executions" },
-    { "name": "Health" }
+    { "name": "executions" },
+    { "name": "health" }
   ],
   "paths": {
     "/flows/{flow_id}/execute": {
-      "parameters": [ { "name": "flow_id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } } ],
+      "parameters": [ { "name": "flow_id", "in": "path", "required": true, "description": "Flow ID", "schema": { "type": "string" } } ],
       "post": {
-        "tags": ["Executions"],
-        "summary": "Inicia uma execução do flow",
-        "description": "Cria a execução no Sequencer (POST /flows/{id}/executions) e persiste o registro HEAD no Runner. É o ponto de entrada correto para a empresa integradora — não chame o Sequencer diretamente para iniciar uma execução.",
+        "tags": ["executions"],
+        "summary": "Inicia uma execução de fluxo",
+        "description": "Cria uma execução no orquestrador e persiste o estado inicial no Runner. O header Authorization é repassado ao orquestrador. É o ponto de entrada correto para a empresa integradora — não chame o Sequencer diretamente para iniciar uma execução.",
         "requestBody": {
           "required": true,
+          "description": "Contato",
           "content": {
             "application/json": {
-              "schema": { "$ref": "#/components/schemas/ExecuteRequest" },
-              "example": {
-                "contact": {
-                  "person_name": "Maria Silva",
-                  "person_documentation": "00000000000",
-                  "person_birthday": "1990-01-01",
-                  "phone_number": "+5511999999999"
-                }
-              }
+              "schema": { "$ref": "#/components/schemas/http.executeRequest" },
+              "example": { "contact": { "person_name": "Maria Silva", "person_documentation": "00000000000", "person_birthday": "1990-01-01", "phone_number": "+5511999999999" } }
             }
           }
         },
         "responses": {
-          "201": {
-            "description": "Execução iniciada",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ExecuteResponse" } } }
-          },
-          "409": { "description": "Flow não está publicado" }
+          "201": { "description": "Created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/http.executeResponse" } } } },
+          "400": { "description": "Bad Request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/http.errorResponse" } } } },
+          "500": { "description": "Internal Server Error", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/http.errorResponse" } } } }
         }
       }
     },
     "/executions/{execution_id}": {
-      "parameters": [ { "name": "execution_id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } } ],
+      "parameters": [ { "name": "execution_id", "in": "path", "required": true, "description": "Execution ID", "schema": { "type": "string" } } ],
       "get": {
-        "tags": ["Executions"],
-        "summary": "HEAD da execução",
-        "description": "Retorna o registro do Runner para o execution_id canônico vindo do Sequencer.",
+        "tags": ["executions"],
+        "summary": "Retorna uma execução",
+        "description": "Busca o registro HEAD da execução pelo execution_id canônico (vindo do orquestrador).",
         "responses": {
-          "200": { "description": "Execução encontrada", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ExecuteResponse" } } } },
-          "404": { "description": "Execução não encontrada" }
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/http.executionResponse" } } } },
+          "404": { "description": "Not Found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/http.errorResponse" } } } },
+          "500": { "description": "Internal Server Error", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/http.errorResponse" } } } }
         }
       }
     },
     "/executions/{execution_id}/steps": {
-      "parameters": [ { "name": "execution_id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } } ],
+      "parameters": [ { "name": "execution_id", "in": "path", "required": true, "description": "Execution ID", "schema": { "type": "string" } } ],
       "get": {
-        "tags": ["Executions"],
-        "summary": "Histórico de steps da execução",
-        "description": "Fonte de dados recomendada para visibilidade de funil (em qual etapa cada transação está).",
+        "tags": ["executions"],
+        "summary": "Lista os steps de uma execução",
+        "description": "Retorna o histórico de etapas da execução, incluindo attribute_type e context vindos do orquestrador. Fonte de dados recomendada para visibilidade de funil.",
         "responses": {
-          "200": {
-            "description": "Histórico de steps",
-            "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/StepHistoryItem" } } } }
-          }
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/http.stepResponse" } } } } },
+          "500": { "description": "Internal Server Error", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/http.errorResponse" } } } }
         }
       }
     },
     "/health": {
       "get": {
-        "tags": ["Health"],
+        "tags": ["health"],
         "summary": "Health check",
         "security": [],
-        "responses": { "200": { "description": "Serviço saudável" } }
+        "description": "Sem autenticação. Indica se a aplicação está em pé e pronta para tráfego.",
+        "responses": {
+          "200": { "description": "{\"status\":\"ok\"}", "content": { "application/json": { "schema": { "type": "object", "additionalProperties": { "type": "string" } } } } }
+        }
       }
     }
   },
   "components": {
     "securitySchemes": {
-      "AuthorizationToken": {
+      "ApiKeyAuth": {
         "type": "apiKey",
         "in": "header",
         "name": "Authorization",
-        "description": "Mesmo token usado no Sequencer (UUID, sem prefixo Bearer). O Runner repassa este header ao Sequencer nas chamadas internas."
+        "description": "UUID do token no header Authorization (sem Bearer)."
       }
     },
     "schemas": {
-      "Contact": {
+      "domain.Contact": {
         "type": "object",
-        "required": ["person_name", "person_documentation", "phone_number"],
         "properties": {
           "person_name": { "type": "string" },
-          "person_documentation": { "type": "string", "description": "CPF do consumidor final" },
-          "person_birthday": { "type": "string", "format": "date" },
-          "phone_number": { "type": "string", "description": "Número de WhatsApp do consumidor final, formato E.164" }
+          "person_documentation": { "type": "string" },
+          "person_birthday": { "type": "string" },
+          "phone_number": { "type": "string" }
         }
       },
-      "ExecuteRequest": {
+      "http.errorResponse": {
         "type": "object",
-        "required": ["contact"],
+        "properties": { "error": { "type": "string" } }
+      },
+      "http.executeRequest": {
+        "type": "object",
+        "properties": { "contact": { "$ref": "#/components/schemas/domain.Contact" } }
+      },
+      "http.executeResponse": {
+        "type": "object",
+        "description": "Resposta de POST /execute — não inclui contact/created_at/updated_at (ver http.executionResponse para o GET).",
         "properties": {
-          "contact": { "$ref": "#/components/schemas/Contact" }
+          "execution_id": { "type": "string" },
+          "flow_id": { "type": "string" },
+          "status": { "type": "string" }
         }
       },
-      "ExecuteResponse": {
+      "http.executionResponse": {
         "type": "object",
+        "description": "Resposta de GET /executions/{execution_id}.",
         "properties": {
-          "execution_id": { "type": "string", "format": "uuid" },
-          "flow_id": { "type": "string", "format": "uuid" },
-          "status": { "type": "string", "enum": ["RUNNING", "WAITING", "COMPLETED", "FAILED"] }
+          "execution_id": { "type": "string" },
+          "flow_id": { "type": "string" },
+          "status": { "type": "string" },
+          "contact": { "$ref": "#/components/schemas/domain.Contact" },
+          "created_at": { "type": "string" },
+          "updated_at": { "type": "string" }
         }
       },
-      "StepHistoryItem": {
+      "http.stepResponse": {
         "type": "object",
         "properties": {
-          "attribute_type": { "type": "string", "enum": ["acceptance", "form", "verify", "signature"] },
-          "context": { "type": "object" },
+          "step_id": { "type": "string" },
+          "attribute_type": { "type": "string" },
+          "context": { "type": "object", "additionalProperties": true },
           "status": { "type": "string" },
           "external_id": { "type": "string" },
-          "started_at": { "type": "string", "format": "date-time" },
-          "updated_at": { "type": "string", "format": "date-time" }
+          "started_at": { "type": "string" },
+          "updated_at": { "type": "string" }
         }
       }
     }

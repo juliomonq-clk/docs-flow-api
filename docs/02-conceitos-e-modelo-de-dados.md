@@ -33,47 +33,88 @@ Cada item da lista `steps[]` de um Flow tem:
 | `type` | `acceptance` \| `form` \| `verify` \| `signature` |
 | `context` | Objeto de configuração específico do tipo (schema livre por tipo) |
 
-### Regras de validação por tipo
+### Regras de validação e campos por tipo
 
-- **`acceptance`**: a estrutura do `context` (`template_key`, `accept_replies`) é validada no **Sequencer**. O *match* da resposta do usuário é validado no **Runner**.
-- **`form`**: aceita `context_map_keys` para "forward-fill" — injeta respostas de steps/forms anteriores (inclusive dados de contato recebidos na abertura da execução) em campos de um form seguinte, via placeholders como `{{person_name}}` e `{{person_documentation}}`. Relevante para jornadas com múltiplos formulários encadeados.
-- **`verify`**: suporta `authentication: liveness` ou `biometric_behavior`. Quando combinado com um `form` anterior, usa `contact_fields_map` para casar campos do form com os dados de identidade a validar.
-- **`signature`**: o `context` (documentos via referência S3 ou template, `folder_key`) é validado no **Runner**, não no Sequencer.
+- **`acceptance`**: `context = { template_key, accept_replies[] }`. A estrutura é validada no **Sequencer**; o *match* da resposta do usuário (comparação com `accept_replies`) é validado no **Runner**.
+  ```json
+  { "type": "acceptance", "context": { "template_key": "chave-do-template", "accept_replies": ["accept", "aceitar"] } }
+  ```
+- **`form`**: `context = { version_key, contact?, context_map_keys? }`. `version_key` identifica a versão do formulário (módulo ClickForm) a ser exibido.
+  ```json
+  { "type": "form", "context": { "version_key": "sua-form-version-key" } }
+  ```
+  - `context_map_keys` faz "forward-fill" — injeta valores de campos de um form anterior (ou do contato recebido na abertura da execução) em campos deste form. É um mapa `campo_destino → { read_only, value }`, onde `value` é a chave do campo de origem (ou um placeholder de contato, como `{{person_name}}`, `{{person_documentation}}`, `{{person_birthday}}`, `{{phone_number}}`):
+    ```json
+    { "type": "form", "context": {
+      "version_key": "versao-formulario-confirmacao",
+      "context_map_keys": {
+        "nome-completo": { "read_only": true, "value": "{{person_name}}" },
+        "cpf": { "read_only": true, "value": "{{person_documentation}}" }
+      }
+    } }
+    ```
+- **`verify`**: `context = { authentication, contact_fields_map? }`, com `authentication: "liveness"` ou `"biometric_behavior"`. Quando combinado com um `form` anterior, `contact_fields_map` casa o campo de identidade com a chave do campo do form onde ele foi coletado — mapa `campo_identidade → chave_do_campo_no_form`:
+  ```json
+  { "type": "verify", "context": {
+    "authentication": "biometric_behavior",
+    "contact_fields_map": { "person_name": "field-key-do-nome", "person_documentation": "field-key-do-documento" }
+  } }
+  ```
+- **`signature`**: `context = { folder_key, documents[] }`, validado no **Runner**, não no Sequencer. Cada item de `documents[]` é um arquivo já existente no S3 (`kind: "file"`, com `s3_bucket`, `s3_key`, `filename`) ou gerado a partir de um modelo Távola (`kind: "template"`, com `template_key`, `filename`) — os dois tipos podem ser combinados na mesma lista. `filename` aceita interpolação de placeholders (ex: `doc_{{person_name}}.docx`).
+  ```json
+  { "type": "signature", "context": {
+    "folder_key": "1fb29ab8-84c4-4856-be37-5fce0f17c11a",
+    "documents": [ { "kind": "template", "template_key": "uuid-do-modelo-tavola", "filename": "contrato-proposta.docx" } ]
+  } }
+  ```
+
+Mais exemplos (aceite, form encadeado, verify com form, assinatura mista) estão nos `examples` de `POST /flows` em [`../collections/openapi/clickflow-sequencer-v1.openapi.json`](../collections/openapi/clickflow-sequencer-v1.openapi.json).
 
 ## Execution
 
 Uma **Execution** é uma transação em andamento (ou concluída) de um Flow publicado — uma instância real da jornada, para uma pessoa específica.
 
-| Campo | Descrição |
-|---|---|
-| `execution_id` | Identificador único da execução |
-| `flow_id` / `flow_name` | Referência ao Flow que originou a execução |
-| `account` | Snapshot da conta no momento em que a execução foi criada |
-| `status` | `RUNNING` \| `WAITING` \| `COMPLETED` \| `FAILED` |
-| `current_step_index` | Índice do step atual dentro de `steps[]` |
-| `created_at` / `updated_at` | Timestamps |
+O Sequencer expõe duas formas de representar uma execução:
+
+- **Formato resumido** (`domain.Execution`) — devolvido pela listagem `GET /flows/{id}/executions`:
+
+  | Campo | Descrição |
+  |---|---|
+  | `execution_id` | Identificador único da execução |
+  | `flow_id` / `flow_name` | Referência ao Flow que originou a execução |
+  | `account` | Snapshot da conta no momento em que a execução foi criada |
+  | `status` | Ver seção de estados, abaixo |
+  | `current_step_index` | Índice do step atual dentro de `steps[]` |
+  | `created_at` / `updated_at` | Timestamps |
+
+- **Formato detalhado** (`handler.ExecutionDetailResponse`) — devolvido por `POST /flows/{id}/executions`, `GET /executions/{execution_id}` e `POST /executions/{execution_id}/next`. Além dos campos acima, traz:
+
+  | Campo | Descrição |
+  |---|---|
+  | `current_step` | `{ type, context }` do step em andamento agora |
+  | `executed_steps[]` | Histórico: `{ type, status, step_index, started_at, finished_at }` de cada step já executado |
 
 ### Estados de uma Execution
 
 ```
-RUNNING ──► WAITING ──► RUNNING ──► COMPLETED
+running ──► waiting ──► running ──► completed
    │                                    ▲
-   └──────────────► FAILED ─────────────┘
+   └──────────────► failed ─────────────┘
 ```
 
-- `RUNNING`: a execução está avançando (ex: acabou de ser criada, ou acabou de avançar de step).
-- `WAITING`: a execução está aguardando uma ação externa (ex: resposta do usuário no WhatsApp).
-- `COMPLETED`: todos os steps foram concluídos com sucesso.
-- `FAILED`: a execução foi encerrada sem sucesso.
+- `running`: a execução está avançando (ex: acabou de ser criada, ou acabou de avançar de step).
+- `waiting`: a execução está aguardando uma ação externa (ex: resposta do usuário no WhatsApp).
+- `completed`: todos os steps foram concluídos com sucesso.
+- `failed`: a execução foi encerrada sem sucesso.
 
-> Os quatro valores são sempre em maiúsculo (`RUNNING`, não `Running` ou `In Progress`).
+> **⚠️ Divergência de casing observada.** O spec publicado pelo próprio serviço (`/api/v1/docs/doc.json`) declara os quatro valores em minúsculo (`running`, `waiting`, `completed`, `failed`). Um payload real de produção capturado em 07/07/2026, porém, trouxe o valor em maiúsculo (`"status": "RUNNING"`). Não assuma um casing fixo — trate a comparação de `status` como *case-insensitive* no seu código até essa divergência ser esclarecida com o time técnico do ClickFlow.
 
 ## Como as três entidades se relacionam
 
 ```
 Flow (draft) ──publish──► Flow (published)
                                 │
-                                ├── POST /executions ──► Execution #1 (RUNNING → ... → COMPLETED)
+                                ├── POST /executions ──► Execution #1 (running → ... → completed)
                                 ├── POST /executions ──► Execution #2
                                 └── POST /executions ──► Execution #N
 ```

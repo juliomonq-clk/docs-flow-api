@@ -9,6 +9,9 @@ Não. Depois de `publish`, a definição fica imutável. Isso garante que execu�
 **Preciso integrar direto com o Sequencer?**
 Não necessariamente. O início e o acompanhamento do dia a dia de uma execução acontecem pelo **Runner**. O Sequencer é consultado quando você precisa do estado consolidado da execução ou quer forçar o avanço manual de um step.
 
+**Tem ambiente de testes (sandbox)?**
+Sim — veja os hosts em [`00-ambientes.md`](00-ambientes.md). Use sempre o Sandbox para testar antes de ir para produção. O Sandbox do Runner foi observado indisponível em 07/07/2026; confirme o status atual com o time técnico antes de depender dele para um teste.
+
 **Existe um canal além do WhatsApp?**
 Hoje não. Um canal `api` (headless, para a empresa integradora construir sua própria interface) está confirmado como direção de arquitetura, mas ainda não faz parte do contrato publicado. Veja [`04-canais.md`](04-canais.md).
 

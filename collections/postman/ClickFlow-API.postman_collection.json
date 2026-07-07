@@ -31,7 +31,7 @@
             "header": [ { "key": "Content-Type", "value": "application/json" } ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Onboarding de colaborador\",\n  \"steps\": [\n    { \"type\": \"form\", \"context\": { \"form_id\": \"<id do formulário>\" } },\n    { \"type\": \"verify\", \"context\": { \"authentication\": \"liveness\" } },\n    { \"type\": \"signature\", \"context\": { \"folder_key\": \"<referência do documento>\" } }\n  ]\n}"
+              "raw": "{\n  \"name\": \"Onboarding de colaborador\",\n  \"steps\": [\n    { \"type\": \"form\", \"context\": { \"version_key\": \"<version_key do formulário>\" } },\n    { \"type\": \"verify\", \"context\": { \"authentication\": \"liveness\" } },\n    { \"type\": \"signature\", \"context\": { \"folder_key\": \"<referência da pasta>\", \"documents\": [ { \"kind\": \"template\", \"template_key\": \"<uuid do modelo Távola>\", \"filename\": \"contrato.docx\" } ] } }\n  ]\n}"
             },
             "url": { "raw": "{{sequencer_base_url}}/flows", "host": ["{{sequencer_base_url}}"], "path": ["flows"] }
           }

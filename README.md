@@ -12,6 +12,7 @@ Este repositório é o ponto de entrada para qualquer empresa que precise **ente
 
 | Se você quer... | Vá para |
 |---|---|
+| Saber os hosts de Sandbox e Produção | [`docs/00-ambientes.md`](docs/00-ambientes.md) |
 | Entender o que o ClickFlow é e resolve | [`docs/01-visao-geral.md`](docs/01-visao-geral.md) |
 | Conhecer o modelo de dados (Flow, Step, Execution) | [`docs/02-conceitos-e-modelo-de-dados.md`](docs/02-conceitos-e-modelo-de-dados.md) |
 | Autenticar suas chamadas | [`docs/03-autenticacao.md`](docs/03-autenticacao.md) |

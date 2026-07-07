@@ -14,9 +14,9 @@ body:json {
   {
     "name": "Onboarding de colaborador",
     "steps": [
-      { "type": "form", "context": { "form_id": "<id do formulário>" } },
+      { "type": "form", "context": { "version_key": "<version_key do formulário>" } },
       { "type": "verify", "context": { "authentication": "liveness" } },
-      { "type": "signature", "context": { "folder_key": "<referência do documento>" } }
+      { "type": "signature", "context": { "folder_key": "<referência da pasta>", "documents": [ { "kind": "template", "template_key": "<uuid do modelo Távola>", "filename": "contrato.docx" } ] } }
     ]
   }
 }
