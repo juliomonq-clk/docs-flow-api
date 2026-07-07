@@ -1,0 +1,26 @@
+meta {
+  name: Iniciar execução (execute)
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{runner_base_url}}/flows/{{flow_id}}/execute
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "contact": {
+      "person_name": "Maria Silva",
+      "person_documentation": "00000000000",
+      "person_birthday": "1990-01-01",
+      "phone_number": "+5511999999999"
+    }
+  }
+}
+
+docs {
+  Ponto de entrada para a empresa integradora iniciar uma execução — não chame o Sequencer diretamente para isso.
+}

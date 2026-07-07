@@ -1,0 +1,11 @@
+meta {
+  name: Estado consolidado da execução
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{sequencer_base_url}}/executions/{{execution_id}}
+  body: none
+  auth: inherit
+}

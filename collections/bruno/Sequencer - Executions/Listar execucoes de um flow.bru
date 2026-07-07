@@ -1,0 +1,11 @@
+meta {
+  name: Listar execuções de um flow
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{sequencer_base_url}}/flows/{{flow_id}}/executions
+  body: none
+  auth: inherit
+}

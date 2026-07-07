@@ -1,0 +1,15 @@
+meta {
+  name: Histórico de steps da execução
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{runner_base_url}}/executions/{{execution_id}}/steps
+  body: none
+  auth: inherit
+}
+
+docs {
+  Fonte de dados recomendada para visibilidade de funil (em qual etapa cada transação está).
+}

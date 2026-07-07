@@ -1,0 +1,11 @@
+meta {
+  name: Listar flows
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{sequencer_base_url}}/flows
+  body: none
+  auth: inherit
+}

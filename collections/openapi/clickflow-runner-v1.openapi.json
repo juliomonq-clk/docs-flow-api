@@ -1,0 +1,131 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "ClickFlow Runner API",
+    "description": "Executor do ClickFlow. Ponto de entrada usado pela empresa integradora para iniciar uma execução e acompanhar o progresso de uma transação. Aciona os módulos corretos e entrega a experiência ao consumidor final no canal configurado (hoje, WhatsApp).",
+    "version": "1.0.0"
+  },
+  "servers": [
+    { "url": "https://clickflow-runner.clicksign.com/api/v1" }
+  ],
+  "security": [{ "AuthorizationToken": [] }],
+  "tags": [
+    { "name": "Executions" },
+    { "name": "Health" }
+  ],
+  "paths": {
+    "/flows/{flow_id}/execute": {
+      "parameters": [ { "name": "flow_id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } } ],
+      "post": {
+        "tags": ["Executions"],
+        "summary": "Inicia uma execução do flow",
+        "description": "Cria a execução no Sequencer (POST /flows/{id}/executions) e persiste o registro HEAD no Runner. É o ponto de entrada correto para a empresa integradora — não chame o Sequencer diretamente para iniciar uma execução.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ExecuteRequest" },
+              "example": {
+                "contact": {
+                  "person_name": "Maria Silva",
+                  "person_documentation": "00000000000",
+                  "person_birthday": "1990-01-01",
+                  "phone_number": "+5511999999999"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Execução iniciada",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ExecuteResponse" } } }
+          },
+          "409": { "description": "Flow não está publicado" }
+        }
+      }
+    },
+    "/executions/{execution_id}": {
+      "parameters": [ { "name": "execution_id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } } ],
+      "get": {
+        "tags": ["Executions"],
+        "summary": "HEAD da execução",
+        "description": "Retorna o registro do Runner para o execution_id canônico vindo do Sequencer.",
+        "responses": {
+          "200": { "description": "Execução encontrada", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ExecuteResponse" } } } },
+          "404": { "description": "Execução não encontrada" }
+        }
+      }
+    },
+    "/executions/{execution_id}/steps": {
+      "parameters": [ { "name": "execution_id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } } ],
+      "get": {
+        "tags": ["Executions"],
+        "summary": "Histórico de steps da execução",
+        "description": "Fonte de dados recomendada para visibilidade de funil (em qual etapa cada transação está).",
+        "responses": {
+          "200": {
+            "description": "Histórico de steps",
+            "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/StepHistoryItem" } } } }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": ["Health"],
+        "summary": "Health check",
+        "security": [],
+        "responses": { "200": { "description": "Serviço saudável" } }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "AuthorizationToken": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "Authorization",
+        "description": "Mesmo token usado no Sequencer (UUID, sem prefixo Bearer). O Runner repassa este header ao Sequencer nas chamadas internas."
+      }
+    },
+    "schemas": {
+      "Contact": {
+        "type": "object",
+        "required": ["person_name", "person_documentation", "phone_number"],
+        "properties": {
+          "person_name": { "type": "string" },
+          "person_documentation": { "type": "string", "description": "CPF do consumidor final" },
+          "person_birthday": { "type": "string", "format": "date" },
+          "phone_number": { "type": "string", "description": "Número de WhatsApp do consumidor final, formato E.164" }
+        }
+      },
+      "ExecuteRequest": {
+        "type": "object",
+        "required": ["contact"],
+        "properties": {
+          "contact": { "$ref": "#/components/schemas/Contact" }
+        }
+      },
+      "ExecuteResponse": {
+        "type": "object",
+        "properties": {
+          "execution_id": { "type": "string", "format": "uuid" },
+          "flow_id": { "type": "string", "format": "uuid" },
+          "status": { "type": "string", "enum": ["RUNNING", "WAITING", "COMPLETED", "FAILED"] }
+        }
+      },
+      "StepHistoryItem": {
+        "type": "object",
+        "properties": {
+          "attribute_type": { "type": "string", "enum": ["acceptance", "form", "verify", "signature"] },
+          "context": { "type": "object" },
+          "status": { "type": "string" },
+          "external_id": { "type": "string" },
+          "started_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" }
+        }
+      }
+    }
+  }
+}

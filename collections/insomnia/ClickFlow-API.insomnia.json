@@ -1,0 +1,190 @@
+{
+  "_type": "export",
+  "__export_format": 4,
+  "__export_date": "2026-07-07T00:00:00.000Z",
+  "__export_source": "docs-flow-api.manual",
+  "resources": [
+    {
+      "_id": "wrk_clickflow",
+      "_type": "workspace",
+      "parentId": null,
+      "name": "ClickFlow API",
+      "description": "Sequencer (Orquestrador) + Runner (Executor) do ClickFlow."
+    },
+    {
+      "_id": "env_base",
+      "_type": "environment",
+      "parentId": "wrk_clickflow",
+      "name": "Base Environment",
+      "data": {
+        "sequencer_base_url": "https://SEU-HOST-SEQUENCER/api/v1",
+        "runner_base_url": "https://clickflow-runner.clicksign.com/api/v1",
+        "access_token": "",
+        "flow_id": "",
+        "execution_id": ""
+      }
+    },
+    {
+      "_id": "fld_sequencer_flows",
+      "_type": "request_group",
+      "parentId": "wrk_clickflow",
+      "name": "Sequencer — Flows"
+    },
+    {
+      "_id": "fld_sequencer_executions",
+      "_type": "request_group",
+      "parentId": "wrk_clickflow",
+      "name": "Sequencer — Executions"
+    },
+    {
+      "_id": "fld_runner_executions",
+      "_type": "request_group",
+      "parentId": "wrk_clickflow",
+      "name": "Runner — Executions"
+    },
+    {
+      "_id": "fld_health",
+      "_type": "request_group",
+      "parentId": "wrk_clickflow",
+      "name": "Health"
+    },
+    {
+      "_id": "req_list_flows",
+      "_type": "request",
+      "parentId": "fld_sequencer_flows",
+      "name": "Listar flows",
+      "method": "GET",
+      "url": "{{ _.sequencer_base_url }}/flows",
+      "headers": [ { "name": "Authorization", "value": "{{ _.access_token }}" } ]
+    },
+    {
+      "_id": "req_create_flow",
+      "_type": "request",
+      "parentId": "fld_sequencer_flows",
+      "name": "Criar flow",
+      "method": "POST",
+      "url": "{{ _.sequencer_base_url }}/flows",
+      "headers": [
+        { "name": "Authorization", "value": "{{ _.access_token }}" },
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"name\": \"Onboarding de colaborador\",\n  \"steps\": [\n    { \"type\": \"form\", \"context\": { \"form_id\": \"<id do formulário>\" } },\n    { \"type\": \"verify\", \"context\": { \"authentication\": \"liveness\" } },\n    { \"type\": \"signature\", \"context\": { \"folder_key\": \"<referência do documento>\" } }\n  ]\n}"
+      }
+    },
+    {
+      "_id": "req_get_flow",
+      "_type": "request",
+      "parentId": "fld_sequencer_flows",
+      "name": "Obter flow por ID",
+      "method": "GET",
+      "url": "{{ _.sequencer_base_url }}/flows/{{ _.flow_id }}",
+      "headers": [ { "name": "Authorization", "value": "{{ _.access_token }}" } ]
+    },
+    {
+      "_id": "req_update_flow",
+      "_type": "request",
+      "parentId": "fld_sequencer_flows",
+      "name": "Atualizar flow (somente draft)",
+      "method": "PUT",
+      "url": "{{ _.sequencer_base_url }}/flows/{{ _.flow_id }}",
+      "headers": [
+        { "name": "Authorization", "value": "{{ _.access_token }}" },
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"name\": \"Onboarding de colaborador — revisado\",\n  \"steps\": []\n}"
+      }
+    },
+    {
+      "_id": "req_publish_flow",
+      "_type": "request",
+      "parentId": "fld_sequencer_flows",
+      "name": "Publicar flow",
+      "method": "PATCH",
+      "url": "{{ _.sequencer_base_url }}/flows/{{ _.flow_id }}/publish",
+      "headers": [ { "name": "Authorization", "value": "{{ _.access_token }}" } ]
+    },
+    {
+      "_id": "req_list_executions",
+      "_type": "request",
+      "parentId": "fld_sequencer_executions",
+      "name": "Listar execuções de um flow",
+      "method": "GET",
+      "url": "{{ _.sequencer_base_url }}/flows/{{ _.flow_id }}/executions",
+      "headers": [ { "name": "Authorization", "value": "{{ _.access_token }}" } ]
+    },
+    {
+      "_id": "req_get_execution",
+      "_type": "request",
+      "parentId": "fld_sequencer_executions",
+      "name": "Estado consolidado da execução",
+      "method": "GET",
+      "url": "{{ _.sequencer_base_url }}/executions/{{ _.execution_id }}",
+      "headers": [ { "name": "Authorization", "value": "{{ _.access_token }}" } ]
+    },
+    {
+      "_id": "req_next_execution",
+      "_type": "request",
+      "parentId": "fld_sequencer_executions",
+      "name": "Avançar para o próximo step",
+      "method": "POST",
+      "url": "{{ _.sequencer_base_url }}/executions/{{ _.execution_id }}/next",
+      "headers": [ { "name": "Authorization", "value": "{{ _.access_token }}" } ]
+    },
+    {
+      "_id": "req_execute",
+      "_type": "request",
+      "parentId": "fld_runner_executions",
+      "name": "Iniciar execução (execute)",
+      "method": "POST",
+      "url": "{{ _.runner_base_url }}/flows/{{ _.flow_id }}/execute",
+      "headers": [
+        { "name": "Authorization", "value": "{{ _.access_token }}" },
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"contact\": {\n    \"person_name\": \"Maria Silva\",\n    \"person_documentation\": \"00000000000\",\n    \"person_birthday\": \"1990-01-01\",\n    \"phone_number\": \"+5511999999999\"\n  }\n}"
+      }
+    },
+    {
+      "_id": "req_execution_head",
+      "_type": "request",
+      "parentId": "fld_runner_executions",
+      "name": "HEAD da execução",
+      "method": "GET",
+      "url": "{{ _.runner_base_url }}/executions/{{ _.execution_id }}",
+      "headers": [ { "name": "Authorization", "value": "{{ _.access_token }}" } ]
+    },
+    {
+      "_id": "req_execution_steps",
+      "_type": "request",
+      "parentId": "fld_runner_executions",
+      "name": "Histórico de steps da execução",
+      "method": "GET",
+      "url": "{{ _.runner_base_url }}/executions/{{ _.execution_id }}/steps",
+      "headers": [ { "name": "Authorization", "value": "{{ _.access_token }}" } ]
+    },
+    {
+      "_id": "req_health_sequencer",
+      "_type": "request",
+      "parentId": "fld_health",
+      "name": "Sequencer — Health",
+      "method": "GET",
+      "url": "{{ _.sequencer_base_url }}/health",
+      "headers": []
+    },
+    {
+      "_id": "req_health_runner",
+      "_type": "request",
+      "parentId": "fld_health",
+      "name": "Runner — Health",
+      "method": "GET",
+      "url": "{{ _.runner_base_url }}/health",
+      "headers": []
+    }
+  ]
+}

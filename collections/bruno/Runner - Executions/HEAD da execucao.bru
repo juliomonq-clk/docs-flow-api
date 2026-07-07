@@ -1,0 +1,11 @@
+meta {
+  name: HEAD da execução
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{runner_base_url}}/executions/{{execution_id}}
+  body: none
+  auth: inherit
+}

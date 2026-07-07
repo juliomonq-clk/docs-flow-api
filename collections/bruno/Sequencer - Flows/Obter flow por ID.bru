@@ -1,0 +1,11 @@
+meta {
+  name: Obter flow por ID
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{sequencer_base_url}}/flows/{{flow_id}}
+  body: none
+  auth: inherit
+}

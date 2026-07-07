@@ -1,0 +1,11 @@
+meta {
+  name: Avançar para o próximo step
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{sequencer_base_url}}/executions/{{execution_id}}/next
+  body: none
+  auth: inherit
+}

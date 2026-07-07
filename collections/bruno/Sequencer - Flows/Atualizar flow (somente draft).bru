@@ -1,0 +1,22 @@
+meta {
+  name: Atualizar flow (somente draft)
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{sequencer_base_url}}/flows/{{flow_id}}
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "Onboarding de colaborador — revisado",
+    "steps": []
+  }
+}
+
+docs {
+  Retorna 403 se o flow não estiver em draft (definição imutável após publish).
+}

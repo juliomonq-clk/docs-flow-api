@@ -1,0 +1,22 @@
+meta {
+  name: Criar flow
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{sequencer_base_url}}/flows
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "name": "Onboarding de colaborador",
+    "steps": [
+      { "type": "form", "context": { "form_id": "<id do formulário>" } },
+      { "type": "verify", "context": { "authentication": "liveness" } },
+      { "type": "signature", "context": { "folder_key": "<referência do documento>" } }
+    ]
+  }
+}

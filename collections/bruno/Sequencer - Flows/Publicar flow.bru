@@ -1,0 +1,11 @@
+meta {
+  name: Publicar flow
+  type: http
+  seq: 5
+}
+
+patch {
+  url: {{sequencer_base_url}}/flows/{{flow_id}}/publish
+  body: none
+  auth: inherit
+}

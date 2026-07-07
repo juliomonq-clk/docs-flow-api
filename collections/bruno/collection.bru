@@ -1,0 +1,13 @@
+headers {
+  Content-Type: application/json
+}
+
+auth {
+  mode: apikey
+}
+
+auth:apikey {
+  key: Authorization
+  value: {{access_token}}
+  placement: header
+}

@@ -1,0 +1,155 @@
+{
+  "info": {
+    "name": "ClickFlow API",
+    "description": "Sequencer (Orquestrador) + Runner (Executor) do ClickFlow. Veja docs/05-guia-de-integracao.md no repositório para o passo a passo completo.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "apikey",
+    "apikey": [
+      { "key": "key", "value": "Authorization", "type": "string" },
+      { "key": "value", "value": "{{access_token}}", "type": "string" },
+      { "key": "in", "value": "header", "type": "string" }
+    ]
+  },
+  "item": [
+    {
+      "name": "Sequencer — Flows",
+      "item": [
+        {
+          "name": "Listar flows",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{sequencer_base_url}}/flows", "host": ["{{sequencer_base_url}}"], "path": ["flows"] }
+          }
+        },
+        {
+          "name": "Criar flow",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Onboarding de colaborador\",\n  \"steps\": [\n    { \"type\": \"form\", \"context\": { \"form_id\": \"<id do formulário>\" } },\n    { \"type\": \"verify\", \"context\": { \"authentication\": \"liveness\" } },\n    { \"type\": \"signature\", \"context\": { \"folder_key\": \"<referência do documento>\" } }\n  ]\n}"
+            },
+            "url": { "raw": "{{sequencer_base_url}}/flows", "host": ["{{sequencer_base_url}}"], "path": ["flows"] }
+          }
+        },
+        {
+          "name": "Obter flow por ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{sequencer_base_url}}/flows/{{flow_id}}", "host": ["{{sequencer_base_url}}"], "path": ["flows", "{{flow_id}}"] }
+          }
+        },
+        {
+          "name": "Atualizar flow (somente draft)",
+          "request": {
+            "method": "PUT",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Onboarding de colaborador — revisado\",\n  \"steps\": []\n}"
+            },
+            "url": { "raw": "{{sequencer_base_url}}/flows/{{flow_id}}", "host": ["{{sequencer_base_url}}"], "path": ["flows", "{{flow_id}}"] }
+          }
+        },
+        {
+          "name": "Publicar flow",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": { "raw": "{{sequencer_base_url}}/flows/{{flow_id}}/publish", "host": ["{{sequencer_base_url}}"], "path": ["flows", "{{flow_id}}", "publish"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Sequencer — Executions",
+      "item": [
+        {
+          "name": "Listar execuções de um flow",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{sequencer_base_url}}/flows/{{flow_id}}/executions", "host": ["{{sequencer_base_url}}"], "path": ["flows", "{{flow_id}}", "executions"] }
+          }
+        },
+        {
+          "name": "Estado consolidado da execução",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{sequencer_base_url}}/executions/{{execution_id}}", "host": ["{{sequencer_base_url}}"], "path": ["executions", "{{execution_id}}"] }
+          }
+        },
+        {
+          "name": "Avançar para o próximo step",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": { "raw": "{{sequencer_base_url}}/executions/{{execution_id}}/next", "host": ["{{sequencer_base_url}}"], "path": ["executions", "{{execution_id}}", "next"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Runner — Executions",
+      "item": [
+        {
+          "name": "Iniciar execução (execute)",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"contact\": {\n    \"person_name\": \"Maria Silva\",\n    \"person_documentation\": \"00000000000\",\n    \"person_birthday\": \"1990-01-01\",\n    \"phone_number\": \"+5511999999999\"\n  }\n}"
+            },
+            "url": { "raw": "{{runner_base_url}}/flows/{{flow_id}}/execute", "host": ["{{runner_base_url}}"], "path": ["flows", "{{flow_id}}", "execute"] }
+          }
+        },
+        {
+          "name": "HEAD da execução",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{runner_base_url}}/executions/{{execution_id}}", "host": ["{{runner_base_url}}"], "path": ["executions", "{{execution_id}}"] }
+          }
+        },
+        {
+          "name": "Histórico de steps da execução",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{runner_base_url}}/executions/{{execution_id}}/steps", "host": ["{{runner_base_url}}"], "path": ["executions", "{{execution_id}}", "steps"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Sequencer — Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": { "type": "noauth" },
+            "url": { "raw": "{{sequencer_base_url}}/health", "host": ["{{sequencer_base_url}}"], "path": ["health"] }
+          }
+        },
+        {
+          "name": "Runner — Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": { "type": "noauth" },
+            "url": { "raw": "{{runner_base_url}}/health", "host": ["{{runner_base_url}}"], "path": ["health"] }
+          }
+        }
+      ]
+    }
+  ]
+}

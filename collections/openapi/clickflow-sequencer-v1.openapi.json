@@ -1,0 +1,187 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "ClickFlow Sequencer API",
+    "description": "Orquestrador do ClickFlow. Guarda a definição de cada Flow e o estado de cada Execution; decide o próximo passo. Não executa módulos e não conhece o canal de entrega — isso é responsabilidade do Runner (ver clickflow-runner-v1.openapi.json).",
+    "version": "1.0.0"
+  },
+  "servers": [
+    { "url": "{sequencer_base_url}", "variables": { "sequencer_base_url": { "default": "https://SEU-HOST-SEQUENCER/api/v1" } } }
+  ],
+  "security": [{ "AuthorizationToken": [] }],
+  "tags": [
+    { "name": "Flows" },
+    { "name": "Executions" },
+    { "name": "Health" }
+  ],
+  "paths": {
+    "/flows": {
+      "get": {
+        "tags": ["Flows"],
+        "summary": "Lista flows",
+        "responses": {
+          "200": {
+            "description": "Lista de flows",
+            "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Flow" } } } }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Flows"],
+        "summary": "Cria um flow (status draft)",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/FlowCreateRequest" }, "example": { "name": "Onboarding de colaborador", "steps": [ { "type": "form", "context": { "form_id": "<id do formulário>" } }, { "type": "verify", "context": { "authentication": "liveness" } }, { "type": "signature", "context": { "folder_key": "<referência do documento>" } } ] } } }
+        },
+        "responses": {
+          "201": { "description": "Flow criado em draft", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Flow" } } } }
+        }
+      }
+    },
+    "/flows/{id}": {
+      "parameters": [ { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } } ],
+      "get": {
+        "tags": ["Flows"],
+        "summary": "Obtém um flow por ID",
+        "responses": {
+          "200": { "description": "Flow encontrado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Flow" } } } },
+          "404": { "description": "Flow não encontrado" }
+        }
+      },
+      "put": {
+        "tags": ["Flows"],
+        "summary": "Atualiza um flow (somente enquanto draft)",
+        "description": "`account` e `user_id` são preservados do recurso persistido e ignorados se enviados no body. Retorna 403 se o flow não estiver em draft.",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/FlowUpdateRequest" } } }
+        },
+        "responses": {
+          "200": { "description": "Flow atualizado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Flow" } } } },
+          "403": { "description": "Flow não está em draft — definição imutável após publish" }
+        }
+      }
+    },
+    "/flows/{id}/publish": {
+      "parameters": [ { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } } ],
+      "patch": {
+        "tags": ["Flows"],
+        "summary": "Publica um flow (draft → published)",
+        "responses": {
+          "200": { "description": "Flow publicado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Flow" } } } },
+          "409": { "description": "Flow já publicado/arquivado" }
+        }
+      }
+    },
+    "/flows/{id}/executions": {
+      "parameters": [ { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } } ],
+      "get": {
+        "tags": ["Executions"],
+        "summary": "Lista execuções de um flow",
+        "responses": {
+          "200": { "description": "Lista de execuções", "content": { "application/json": { "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Execution" } } } } }
+        }
+      },
+      "post": {
+        "tags": ["Executions"],
+        "summary": "Inicia execução de um flow publicado",
+        "description": "Chamado internamente pelo Runner ao receber POST /flows/{flow_id}/execute — não é o ponto de entrada usado pela empresa integradora. Persiste flow_name e snapshot de account.",
+        "responses": {
+          "201": { "description": "Execução criada", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Execution" } } } },
+          "409": { "description": "Flow não está publicado" }
+        }
+      }
+    },
+    "/executions/{execution_id}": {
+      "parameters": [ { "name": "execution_id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } } ],
+      "get": {
+        "tags": ["Executions"],
+        "summary": "Estado consolidado da execução",
+        "responses": {
+          "200": { "description": "Execução encontrada", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Execution" } } } },
+          "404": { "description": "Execução não encontrada" }
+        }
+      }
+    },
+    "/executions/{execution_id}/next": {
+      "parameters": [ { "name": "execution_id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } } ],
+      "post": {
+        "tags": ["Executions"],
+        "summary": "Avança a execução para o próximo step",
+        "responses": {
+          "200": { "description": "Execução avançada", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Execution" } } } },
+          "409": { "description": "Execução não está em um estado que permite avançar" }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": ["Health"],
+        "summary": "Health check",
+        "security": [],
+        "responses": { "200": { "description": "Serviço saudável" } }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "AuthorizationToken": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "Authorization",
+        "description": "Token de acesso (UUID), sem prefixo Bearer. Validado por introspecção; retorna user_id e account."
+      }
+    },
+    "schemas": {
+      "FlowStep": {
+        "type": "object",
+        "required": ["type", "context"],
+        "properties": {
+          "type": { "type": "string", "enum": ["acceptance", "form", "verify", "signature"] },
+          "context": { "type": "object", "description": "Schema livre, específico por tipo — ver docs/02-conceitos-e-modelo-de-dados.md" }
+        }
+      },
+      "Flow": {
+        "type": "object",
+        "properties": {
+          "flow_id": { "type": "string", "format": "uuid" },
+          "name": { "type": "string" },
+          "status": { "type": "string", "enum": ["draft", "published", "archived"] },
+          "steps": { "type": "array", "items": { "$ref": "#/components/schemas/FlowStep" } },
+          "account": { "type": "object", "properties": { "id": { "type": "integer" }, "key": { "type": "string", "format": "uuid" }, "name": { "type": "string" } } },
+          "user_id": { "type": "string" },
+          "created_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "FlowCreateRequest": {
+        "type": "object",
+        "required": ["name", "steps"],
+        "properties": {
+          "name": { "type": "string" },
+          "steps": { "type": "array", "items": { "$ref": "#/components/schemas/FlowStep" } }
+        }
+      },
+      "FlowUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "steps": { "type": "array", "items": { "$ref": "#/components/schemas/FlowStep" } }
+        }
+      },
+      "Execution": {
+        "type": "object",
+        "properties": {
+          "execution_id": { "type": "string", "format": "uuid" },
+          "flow_id": { "type": "string", "format": "uuid" },
+          "flow_name": { "type": "string" },
+          "account": { "type": "object", "properties": { "id": { "type": "integer" }, "key": { "type": "string", "format": "uuid" }, "name": { "type": "string" } } },
+          "status": { "type": "string", "enum": ["RUNNING", "WAITING", "COMPLETED", "FAILED"] },
+          "current_step_index": { "type": "integer" },
+          "created_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" }
+        }
+      }
+    }
+  }
+}
