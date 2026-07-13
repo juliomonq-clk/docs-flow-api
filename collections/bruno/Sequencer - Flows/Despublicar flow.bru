@@ -1,0 +1,15 @@
+meta {
+  name: Despublicar flow
+  type: http
+  seq: 6
+}
+
+patch {
+  url: {{sequencer_base_url}}/flows/{{flow_id}}/unpublish
+  body: none
+  auth: inherit
+}
+
+docs {
+  Move published → unpublished. Permite voltar a editar (PUT) o flow. Não afeta execuções em andamento.
+}

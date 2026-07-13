@@ -20,7 +20,7 @@ O ClickFlow resolve isso orquestrando as etapas como uma sequência única, entr
 |---|---|---|
 | **Sequencer** (Orquestrador) | Guarda a definição do fluxo, controla o estado da transação, decide o próximo passo | Não executa módulos, não conhece o canal de entrega |
 | **Runner** (Executor) | Recebe a instrução do Sequencer, aciona o módulo correto, entrega a experiência ao consumidor final no canal configurado | Não decide a ordem das etapas |
-| **Módulos** (Form, Verify, Assinatura, Aceite) | Executam uma capacidade de negócio específica de forma autônoma | Não dependem uns dos outros nem do canal |
+| **Módulos** (Form, Verify, KYC, Assinatura, Aceite) | Executam uma capacidade de negócio específica de forma autônoma | Não dependem uns dos outros nem do canal |
 
 Essa separação é uma decisão de arquitetura deliberada: qualquer módulo pode, em tese, ser usado de forma independente, fora da esteira completa.
 
@@ -31,6 +31,7 @@ Um Flow é uma sequência de *steps*. Os tipos suportados atualmente são:
 - **`acceptance`** — aceite rápido de um termo/condição (ex: aceite de novos termos), sem geração de documento completo.
 - **`form`** — coleta de dados estruturados (módulo ClickForm).
 - **`verify`** — autenticação do usuário (liveness e/ou biometria comportamental).
+- **`kyc`** *(novo, 13/07/2026)* — checagem de conhecimento de cliente (KYC), para pessoa física (`customer`) ou jurídica (`business`), tipicamente encadeada após um `verify`.
 - **`signature`** — coleta de assinatura eletrônica no documento gerado para a transação.
 
 Detalhe de cada tipo (estrutura de `context`, regras de validação) está em [`02-conceitos-e-modelo-de-dados.md`](02-conceitos-e-modelo-de-dados.md).

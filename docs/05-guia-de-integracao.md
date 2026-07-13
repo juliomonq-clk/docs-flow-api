@@ -32,7 +32,14 @@ PATCH {{sequencer_base_url}}/flows/{flow_id}/publish
 Authorization: <token>
 ```
 
-A partir daqui, o Flow passa a `status: "published"` e sua definição fica imutável — uma tentativa de `PUT` retorna `403 Forbidden`.
+A partir daqui, o Flow passa a `status: "published"` e uma tentativa de `PUT` retorna `403 Forbidden`. Para voltar a editar, despublique antes:
+
+```http
+PATCH {{sequencer_base_url}}/flows/{flow_id}/unpublish
+Authorization: <token>
+```
+
+Isso move o Flow para `status: "unpublished"` (não afeta execuções já em andamento). Depois de editar via `PUT`, publique de novo com o mesmo `PATCH .../publish` do passo anterior.
 
 ## 3. Iniciar uma execução (Runner)
 
@@ -59,13 +66,16 @@ Resposta:
 {
   "execution_id": "<uuid>",
   "flow_id": "<uuid>",
-  "status": "running"
+  "status": "running",
+  "channel": "whatsapp"
 }
 ```
 
 > O casing exato de `status` tem uma divergência conhecida entre o spec e payloads reais — ver [`02-conceitos-e-modelo-de-dados.md`](02-conceitos-e-modelo-de-dados.md#estados-de-uma-execution).
 
-A partir deste ponto, o consumidor final (`Maria Silva`) recebe a primeira etapa da jornada pelo WhatsApp, no número informado.
+A partir deste ponto, o consumidor final (`Maria Silva`) recebe a primeira etapa da jornada pelo WhatsApp, no número informado. Esse `POST` aceita também `"channel": "api"` para o modo headless, sem envio automático de mensagens — ver [`04-canais.md`](04-canais.md).
+
+> Se o Flow tiver um step `signature`, o avanço para o próximo passo não é automático no `next`: ele depende do Runner receber o webhook de assinatura do Tavola (`POST /webhooks/signature`) confirmando o evento `sign`. Isso é interno ao Runner — a empresa integradora não precisa configurar nada, mas explica por que uma execução pode ficar em `waiting`/`running` até a assinatura ser concluída no Tavola.
 
 ## 4. Acompanhar o progresso
 
@@ -99,6 +109,15 @@ Authorization: <token>
 ## 6. Encerramento
 
 A execução chega a `completed` quando todos os steps forem concluídos com sucesso, ou a `failed` caso algum step seja encerrado sem sucesso. Veja o detalhamento de estados em [`06-referencia-de-erros-e-status.md`](06-referencia-de-erros-e-status.md).
+
+Se o Flow em si não for mais necessário (ex: substituído por uma nova versão), remova-o:
+
+```http
+DELETE {{sequencer_base_url}}/flows/{flow_id}
+Authorization: <token>
+```
+
+`204 No Content` — soft delete, o Flow passa para `status: "deleted"`. Execuções já criadas a partir dele não são afetadas.
 
 ## Testando sem escrever código
 

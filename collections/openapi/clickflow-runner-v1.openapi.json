@@ -3,7 +3,7 @@
   "info": {
     "title": "ClickFlow Runner API",
     "version": "1.0",
-    "description": "### Visão geral\n\nO ClickFlow Runner inicia e acompanha execuções de fluxos conversacionais em nome de um contato. O fluxo é definido no orquestrador; o Runner executa cada etapa e persiste o estado para auditoria.\n\n### Como usar\n\n1. Iniciar uma execução — `POST /api/v1/flows/{flow_id}/execute`. Informe o contato (telefone, nome, etc.) e o Runner inicia o fluxo.\n2. Acompanhar — `GET /api/v1/executions/{execution_id}`. Consulte o status da execução e de cada etapa.\n\n### Autenticação\n\nTodas as rotas exigem o header `Authorization` com o UUID do token (sem prefixo `Bearer`).\n\n---\nConvertido a partir do spec Swagger 2.0 extraído do endpoint de documentação viva do serviço (`/api/v1/docs/doc.json`) em 07/07/2026. `servers` abaixo foram adicionados por este repositório.",
+    "description": "### Visão geral\n\nO ClickFlow Runner inicia e acompanha execuções de fluxos conversacionais em nome de um contato. O fluxo é definido no orquestrador; o Runner executa cada etapa e persiste o estado para auditoria.\n\n### Como usar\n\n1. Iniciar uma execução — `POST /api/v1/flows/{flow_id}/execute`. Informe o contato (telefone, nome, etc.) e, opcionalmente, o `channel` (`whatsapp` padrão, ou `api` para modo headless).\n2. Acompanhar — `GET /api/v1/executions/{execution_id}`. Consulte o status da execução e de cada etapa.\n\n### Canal `api` (headless)\n\nConfirmado no contrato publicado em 13/07/2026. Com `channel: \"api\"`, o Runner não envia mensagens automáticas via WhatsApp (exceto para steps `acceptance`, que continuam exigindo WhatsApp) — a resposta traz `current_step.url`, e a empresa integradora é responsável por entregar o link ao contato.\n\n### Webhook de assinatura\n\n`POST /api/v1/webhooks/signature` recebe callbacks do Tavola para avançar steps de assinatura.\n\n### Autenticação\n\nTodas as rotas exigem o header `Authorization` com o UUID do token (sem prefixo `Bearer`).\n\n---\nConvertido a partir do spec Swagger 2.0 extraído do endpoint de documentação viva do serviço (`/api/v1/docs/doc.json`) em 13/07/2026 (revisão anterior: 07/07/2026). `servers` abaixo foram adicionados por este repositório.",
     "contact": { "name": "Clicksign — ClickFlow" }
   },
   "servers": [
@@ -13,6 +13,7 @@
   "security": [{ "ApiKeyAuth": [] }],
   "tags": [
     { "name": "executions" },
+    { "name": "webhooks" },
     { "name": "health" }
   ],
   "paths": {
@@ -21,20 +22,45 @@
       "post": {
         "tags": ["executions"],
         "summary": "Inicia uma execução de fluxo",
-        "description": "Cria uma execução no orquestrador e persiste o estado inicial no Runner. O header Authorization é repassado ao orquestrador. É o ponto de entrada correto para a empresa integradora — não chame o Sequencer diretamente para iniciar uma execução.",
+        "description": "Cria uma execução no orquestrador e persiste o estado inicial no Runner. O header Authorization é repassado ao orquestrador. É o ponto de entrada correto para a empresa integradora — não chame o Sequencer diretamente para iniciar uma execução.\n\n**Canal `whatsapp` (padrão):** Runner envia mensagens automáticas via WhatsApp — apresentação, links de form/verify/signature e conclusão. `contact.phone_number` é obrigatório.\n\n**Canal `api`:** Runner não envia mensagens automáticas. A resposta inclui `current_step.url` com o link do passo atual para o cliente entregar ao contato. `contact.phone_number` é opcional. Exceção: steps `acceptance` sempre enviam WhatsApp (interação funcional) e falham se o contato não tiver phone_number.",
         "requestBody": {
           "required": true,
-          "description": "Contato",
+          "description": "Contato e canal",
           "content": {
             "application/json": {
               "schema": { "$ref": "#/components/schemas/http.executeRequest" },
-              "example": { "contact": { "person_name": "Maria Silva", "person_documentation": "00000000000", "person_birthday": "1990-01-01", "phone_number": "+5511999999999" } }
+              "examples": {
+                "whatsapp": { "summary": "Canal whatsapp (padrão)", "value": { "contact": { "person_name": "Maria Silva", "person_documentation": "00000000000", "person_birthday": "1990-01-01", "phone_number": "+5511999999999" } } },
+                "api": { "summary": "Canal api (headless)", "value": { "channel": "api", "contact": { "person_name": "Maria Silva", "person_documentation": "00000000000", "person_birthday": "1990-01-01", "phone_number": "+5511999999999" } } }
+              }
             }
           }
         },
         "responses": {
-          "201": { "description": "Created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/http.executeResponse" } } } },
+          "201": { "description": "Created", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/http.executionResponse" } } } },
           "400": { "description": "Bad Request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/http.errorResponse" } } } },
+          "500": { "description": "Internal Server Error", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/http.errorResponse" } } } }
+        }
+      }
+    },
+    "/webhooks/signature": {
+      "post": {
+        "tags": ["webhooks"],
+        "summary": "Webhook de assinatura (Tavola)",
+        "description": "Recebe callbacks de assinatura do Tavola. Eventos diferentes de \"sign\" e signer_key sem step correspondente (documento fora do flow) retornam 200 para evitar retries.",
+        "security": [],
+        "parameters": [
+          { "name": "Content-Hmac", "in": "header", "description": "Assinatura HMAC no formato SHA256=<hex> (obrigatória apenas para eventos sign com signer_key pertencente a um step)", "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Payload do evento",
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/http.SignatureWebhookPayload" } } }
+        },
+        "responses": {
+          "200": { "description": "status: processed (evento sign avançou o step) ou ignored (evento não é sign, ou signer_key sem step correspondente)", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/http.signatureWebhookResponse" } } } },
+          "400": { "description": "Bad Request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/http.errorResponse" } } } },
+          "401": { "description": "Unauthorized — HMAC inválido", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/http.errorResponse" } } } },
           "500": { "description": "Internal Server Error", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/http.errorResponse" } } } }
         }
       }
@@ -101,27 +127,62 @@
       },
       "http.executeRequest": {
         "type": "object",
-        "properties": { "contact": { "$ref": "#/components/schemas/domain.Contact" } }
-      },
-      "http.executeResponse": {
-        "type": "object",
-        "description": "Resposta de POST /execute — não inclui contact/created_at/updated_at (ver http.executionResponse para o GET).",
         "properties": {
-          "execution_id": { "type": "string" },
-          "flow_id": { "type": "string" },
-          "status": { "type": "string" }
+          "channel": {
+            "type": "string",
+            "enum": ["whatsapp", "api"],
+            "example": "whatsapp",
+            "description": "Canal de comunicação da execução.\n\"whatsapp\" (padrão, compatível com versões anteriores): Runner envia mensagens automáticas via WhatsApp em todas as etapas — apresentação, steps form/verify/signature e conclusão. contact.phone_number é obrigatório.\n\"api\": Runner não envia mensagens automáticas. O cliente é responsável por entregar os links ao contato. A resposta inclui o objeto current_step com id, type e url do passo em andamento. contact.phone_number é opcional (exceto para steps acceptance, que sempre exigem WhatsApp).\nOmitir o campo equivale a \"whatsapp\". Qualquer outro valor retorna 400."
+          },
+          "contact": { "$ref": "#/components/schemas/domain.Contact" }
+        }
+      },
+      "http.currentStepResp": {
+        "type": "object",
+        "description": "Passo em andamento. Presente somente quando channel=\"api\" e há step RUNNING. Permite ao cliente saber qual URL entregar ao contato sem precisar consultar os steps.",
+        "properties": {
+          "id": { "type": "string", "description": "ID do step no orquestrador", "example": "3" },
+          "type": { "type": "string", "enum": ["form", "verify", "signature", "acceptance"], "description": "Tipo do step. ⚠️ Este enum não lista `kyc` na fonte do spec — confirmar com o time técnico se steps kyc produzem current_step.", "example": "signature" },
+          "url": { "type": "string", "nullable": true, "description": "Link para o contato acessar. null para acceptance.", "example": "https://app.clicksign.com/notarial/widget/signatures/uuid/redirect" }
         }
       },
       "http.executionResponse": {
         "type": "object",
-        "description": "Resposta de GET /executions/{execution_id}.",
+        "description": "Resposta de POST /execute (201) e de GET /executions/{execution_id} (200) — schema unificado desde 13/07/2026 (antes, POST tinha um schema reduzido próprio).",
         "properties": {
           "execution_id": { "type": "string" },
           "flow_id": { "type": "string" },
-          "status": { "type": "string" },
+          "status": { "type": "string", "enum": ["running", "completed", "failed"], "example": "running", "description": "⚠️ Divergência observada: o Runner não expõe o estado `waiting` que existe no Sequencer (domain.ExecutionStatus tem 4 valores: running/waiting/completed/failed). Ver docs/02-conceitos-e-modelo-de-dados.md." },
+          "channel": { "type": "string", "enum": ["whatsapp", "api"], "example": "whatsapp", "description": "Canal definido no POST /execute. \"whatsapp\": Runner gerencia envio de mensagens. \"api\": cliente gerencia entrega dos links." },
+          "current_step": { "allOf": [ { "$ref": "#/components/schemas/http.currentStepResp" } ] },
           "contact": { "$ref": "#/components/schemas/domain.Contact" },
           "created_at": { "type": "string" },
-          "updated_at": { "type": "string" }
+          "updated_at": { "type": "string" },
+          "presentation_runner_error": { "type": "object", "additionalProperties": {} },
+          "whatsapp_presentation_outbound": { "type": "object", "additionalProperties": {} },
+          "whatsapp_conclusion_outbound": { "type": "object", "additionalProperties": {} }
+        }
+      },
+      "http.SignatureWebhookPayload": {
+        "type": "object",
+        "properties": {
+          "document": { "type": "object", "properties": { "key": { "type": "string" } } },
+          "event": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "data": { "type": "object", "properties": { "signer": { "type": "object", "properties": { "key": { "type": "string" }, "phone_number": { "type": "string" } } } } }
+            }
+          }
+        }
+      },
+      "http.signatureWebhookResponse": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string" },
+          "document_key": { "type": "string" },
+          "signer_key": { "type": "string" },
+          "reason": { "type": "string" }
         }
       },
       "http.stepResponse": {

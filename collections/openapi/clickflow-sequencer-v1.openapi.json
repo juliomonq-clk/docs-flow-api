@@ -3,7 +3,7 @@
   "info": {
     "title": "ClickFlow Orchestrator API",
     "version": "1.0",
-    "description": "### Visão geral\n\nO ClickFlow Orchestrator é o serviço central responsável pelo estado e pela sequência linear de jornadas transacionais, composta por módulos desacoplados: WhatsApp, Formulários, Verificação e Assinatura.\n\n### Persistência e responsabilidades\n\nA orquestração é exposta como serviço stateless; o estado autoritativo fica em Amazon DynamoDB. A API separa claramente duas frentes de operação:\n\n- Flows — definição estrutural da jornada: ordem dos steps e o contexto associado a cada etapa.\n- Executions — instâncias em execução: criação, transição entre steps e rastreamento do progresso em tempo real.\n\n### Autenticação e Segurança\n\nTodos os recursos da rota `/api/v1` exigem autenticação. Envie o cabeçalho `Authorization` contendo exclusivamente o UUID do token (sem prefixo `Bearer`).\n\n---\nSpec extraído do endpoint de documentação viva do serviço (`/api/v1/docs/doc.json`) em 07/07/2026. `servers` abaixo foram adicionados por este repositório — não fazem parte do spec original.",
+    "description": "### Visão geral\n\nO ClickFlow Orchestrator é o serviço central responsável pelo estado e pela sequência linear de jornadas transacionais, composta por módulos desacoplados: WhatsApp, Formulários, Verificação, KYC e Assinatura.\n\n### Persistência e responsabilidades\n\nA orquestração é exposta como serviço stateless; o estado autoritativo fica em Amazon DynamoDB. A API separa claramente duas frentes de operação:\n\n- Flows — definição estrutural da jornada: ordem dos steps e o contexto associado a cada etapa.\n- Executions — instâncias em execução: criação, transição entre steps e rastreamento do progresso em tempo real.\n\n### Autenticação e Segurança\n\nTodos os recursos da rota `/api/v1` exigem autenticação. Envie o cabeçalho `Authorization` contendo exclusivamente o UUID do token (sem prefixo `Bearer`).\n\nOs recursos da rota `/api/internal` são exclusivos para uso interno do frontend Tavola — autenticação via `Authorization: Bearer <jwt>` (RS512) com sessão em Redis. Não fazem parte do contrato público e não estão documentados aqui.\n\n---\nSpec extraído do endpoint de documentação viva do serviço (`/api/v1/docs/doc.json`) em 13/07/2026 (revisão anterior: 07/07/2026). `servers` abaixo foram adicionados por este repositório — não fazem parte do spec original.",
     "contact": { "name": "Clicksign — ClickFlow" }
   },
   "servers": [
@@ -45,6 +45,8 @@
                 "verify": { "summary": "Verify — liveness", "value": { "name": "Proposta Crédito — verify", "steps": [ { "type": "verify", "context": { "authentication": "liveness" } } ] } },
                 "verify_biometric_behavior": { "summary": "Verify — biometric_behavior", "value": { "name": "Proposta Crédito — verify biometric_behavior", "steps": [ { "type": "verify", "context": { "authentication": "biometric_behavior" } } ] } },
                 "verify_biometric_behavior_with_form": { "summary": "Verify — biometric_behavior + form", "value": { "name": "Proposta Crédito — verify biometric_behavior + form", "steps": [ { "type": "form", "context": { "version_key": "sua-form-version-key" } }, { "type": "verify", "context": { "authentication": "biometric_behavior", "contact_fields_map": { "person_name": "field-key-do-nome", "person_documentation": "field-key-do-documento" } } } ] } },
+                "kyc_biometric_behavior": { "summary": "KYC — biometric_behavior + kyc (CNPJ)", "value": { "name": "Proposta Crédito — verify biometric_behavior + kyc (CNPJ)", "steps": [ { "type": "verify", "context": { "authentication": "biometric_behavior" } }, { "type": "kyc", "context": { "type": "business" } } ] } },
+                "kyc_form_biometric_behavior": { "summary": "KYC — form + biometric_behavior + kyc (CPF)", "value": { "name": "Proposta Crédito — form + verify biometric_behavior + kyc (CPF)", "steps": [ { "type": "form", "context": { "version_key": "sua-form-version-key" } }, { "type": "verify", "context": { "authentication": "biometric_behavior", "contact_fields_map": { "person_name": "field-key-do-nome", "person_documentation": "field-key-do-documento" } } }, { "type": "kyc", "context": { "type": "customer" } } ] } },
                 "signature_file": { "summary": "Signature — arquivo S3", "value": { "name": "Proposta Crédito", "steps": [ { "type": "signature", "context": { "folder_key": "1fb29ab8-84c4-4856-be37-5fce0f17c11a", "documents": [ { "kind": "file", "s3_bucket": "meu-bucket", "s3_key": "caminho/para/contrato.pdf", "filename": "contrato-proposta.pdf" } ] } } ] } },
                 "signature_template": { "summary": "Signature — modelo Távola", "value": { "name": "Proposta Crédito — template", "steps": [ { "type": "signature", "context": { "folder_key": "1fb29ab8-84c4-4856-be37-5fce0f17c11a", "documents": [ { "kind": "template", "template_key": "uuid-do-modelo-tavola", "filename": "contrato-proposta.docx" } ] } } ] } },
                 "signature_mixed": { "summary": "Signature — arquivo S3 + modelo Távola", "value": { "name": "Proposta Crédito — arquivo S3 + template", "steps": [ { "type": "signature", "context": { "folder_key": "1fb29ab8-84c4-4856-be37-5fce0f17c11a", "documents": [ { "kind": "file", "s3_bucket": "meu-bucket", "s3_key": "caminho/para/anexo.pdf", "filename": "anexo.pdf" }, { "kind": "template", "template_key": "uuid-do-modelo-tavola", "filename": "contrato.docx" } ] } } ] } },
@@ -76,7 +78,7 @@
       "put": {
         "tags": ["flows"],
         "summary": "Atualiza flow",
-        "description": "Envia tipicamente name e steps. account e user_id são preservados do recurso persistido (ignorados no body). Retorna 403 se o flow não estiver em draft — definição imutável após publish.",
+        "description": "Envia tipicamente name e steps. account e user_id são preservados do recurso persistido (ignorados no body). Retorna 403 se o flow estiver `published` — despublique antes via PATCH /flows/{id}/unpublish para voltar a editar (ver domain.FlowStatus).",
         "requestBody": {
           "required": true,
           "description": "Campos (ex.: name, steps)",
@@ -86,7 +88,18 @@
           "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/domain.Flow" } } } },
           "400": { "description": "Bad Request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/handler.ErrorResponse" } } } },
           "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/handler.ErrorUnauthorizedResponse" } } } },
-          "403": { "description": "Forbidden — flow não está em draft", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/handler.ErrorResponse" } } } },
+          "403": { "description": "Forbidden — flow está published (despublique antes de editar)", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/handler.ErrorResponse" } } } },
+          "404": { "description": "Not Found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/handler.ErrorResponse" } } } }
+        }
+      },
+      "delete": {
+        "tags": ["flows"],
+        "summary": "Remove flow",
+        "description": "Soft delete — o flow passa para status `deleted`. Único caminho para remover um flow (não há hard delete no contrato público).",
+        "responses": {
+          "204": { "description": "No Content" },
+          "400": { "description": "Bad Request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/handler.ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/handler.ErrorUnauthorizedResponse" } } } },
           "404": { "description": "Not Found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/handler.ErrorResponse" } } } }
         }
       }
@@ -95,7 +108,22 @@
       "parameters": [ { "name": "id", "in": "path", "required": true, "description": "Flow ID", "schema": { "type": "string" } } ],
       "patch": {
         "tags": ["flows"],
-        "summary": "Publica flow (draft → published)",
+        "summary": "Publica flow (draft ou unpublished → published)",
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/domain.Flow" } } } },
+          "400": { "description": "Bad Request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/handler.ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/handler.ErrorUnauthorizedResponse" } } } },
+          "404": { "description": "Not Found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/handler.ErrorResponse" } } } },
+          "409": { "description": "Conflict", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/handler.ErrorResponse" } } } }
+        }
+      }
+    },
+    "/flows/{id}/unpublish": {
+      "parameters": [ { "name": "id", "in": "path", "required": true, "description": "Flow ID", "schema": { "type": "string" } } ],
+      "patch": {
+        "tags": ["flows"],
+        "summary": "Despublica flow (published → unpublished)",
+        "description": "Permite voltar a editar (PUT) um flow que já foi publicado. Execuções em andamento não são afetadas.",
         "responses": {
           "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/domain.Flow" } } } },
           "400": { "description": "Bad Request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/handler.ErrorResponse" } } } },
@@ -189,13 +217,14 @@
       },
       "domain.FlowStatus": {
         "type": "string",
-        "enum": ["draft", "published", "archived"],
-        "x-enum-varnames": ["FlowStatusDraft", "FlowStatusPublished", "FlowStatusArchived"]
+        "enum": ["draft", "published", "unpublished", "deleted"],
+        "x-enum-varnames": ["FlowStatusDraft", "FlowStatusPublished", "FlowStatusUnpublished", "FlowStatusDeleted"],
+        "description": "⚠️ Mudança de contrato (13/07/2026): o valor `archived` foi substituído por `unpublished` (via PATCH /flows/{id}/unpublish) e `deleted` (soft delete via DELETE /flows/{id})."
       },
       "domain.FlowStepType": {
         "type": "string",
-        "enum": ["acceptance", "form", "verify", "signature"],
-        "x-enum-varnames": ["FlowStepTypeAcceptance", "FlowStepTypeForm", "FlowStepTypeVerify", "FlowStepTypeSignature"]
+        "enum": ["acceptance", "form", "verify", "kyc", "signature"],
+        "x-enum-varnames": ["FlowStepTypeAcceptance", "FlowStepTypeForm", "FlowStepTypeVerify", "FlowStepTypeKYC", "FlowStepTypeSignature"]
       },
       "domain.FlowStep": {
         "type": "object",

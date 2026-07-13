@@ -1,0 +1,15 @@
+meta {
+  name: Remover flow
+  type: http
+  seq: 7
+}
+
+delete {
+  url: {{sequencer_base_url}}/flows/{{flow_id}}
+  body: none
+  auth: inherit
+}
+
+docs {
+  Soft delete — o flow passa para status "deleted". Retorna 204 No Content. Não há hard delete no contrato público.
+}

@@ -45,7 +45,7 @@
           }
         },
         {
-          "name": "Atualizar flow (somente draft)",
+          "name": "Atualizar flow (draft ou unpublished)",
           "request": {
             "method": "PUT",
             "header": [ { "key": "Content-Type", "value": "application/json" } ],
@@ -53,7 +53,8 @@
               "mode": "raw",
               "raw": "{\n  \"name\": \"Onboarding de colaborador — revisado\",\n  \"steps\": []\n}"
             },
-            "url": { "raw": "{{sequencer_base_url}}/flows/{{flow_id}}", "host": ["{{sequencer_base_url}}"], "path": ["flows", "{{flow_id}}"] }
+            "url": { "raw": "{{sequencer_base_url}}/flows/{{flow_id}}", "host": ["{{sequencer_base_url}}"], "path": ["flows", "{{flow_id}}"] },
+            "description": "Retorna 403 se o flow estiver published — despublique antes (\"Despublicar flow\")."
           }
         },
         {
@@ -61,7 +62,26 @@
           "request": {
             "method": "PATCH",
             "header": [],
-            "url": { "raw": "{{sequencer_base_url}}/flows/{{flow_id}}/publish", "host": ["{{sequencer_base_url}}"], "path": ["flows", "{{flow_id}}", "publish"] }
+            "url": { "raw": "{{sequencer_base_url}}/flows/{{flow_id}}/publish", "host": ["{{sequencer_base_url}}"], "path": ["flows", "{{flow_id}}", "publish"] },
+            "description": "draft ou unpublished → published."
+          }
+        },
+        {
+          "name": "Despublicar flow",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": { "raw": "{{sequencer_base_url}}/flows/{{flow_id}}/unpublish", "host": ["{{sequencer_base_url}}"], "path": ["flows", "{{flow_id}}", "unpublish"] },
+            "description": "published → unpublished. Permite voltar a editar o flow. Não afeta execuções em andamento."
+          }
+        },
+        {
+          "name": "Remover flow",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": { "raw": "{{sequencer_base_url}}/flows/{{flow_id}}", "host": ["{{sequencer_base_url}}"], "path": ["flows", "{{flow_id}}"] },
+            "description": "Soft delete — status passa a \"deleted\". Retorna 204 No Content."
           }
         }
       ]
@@ -107,7 +127,21 @@
               "mode": "raw",
               "raw": "{\n  \"contact\": {\n    \"person_name\": \"Maria Silva\",\n    \"person_documentation\": \"00000000000\",\n    \"person_birthday\": \"1990-01-01\",\n    \"phone_number\": \"+5511999999999\"\n  }\n}"
             },
-            "url": { "raw": "{{runner_base_url}}/flows/{{flow_id}}/execute", "host": ["{{runner_base_url}}"], "path": ["flows", "{{flow_id}}", "execute"] }
+            "url": { "raw": "{{runner_base_url}}/flows/{{flow_id}}/execute", "host": ["{{runner_base_url}}"], "path": ["flows", "{{flow_id}}", "execute"] },
+            "description": "Canal padrão (channel omitido = \"whatsapp\"). Para o modo headless, veja \"Iniciar execução (canal api)\"."
+          }
+        },
+        {
+          "name": "Iniciar execução (canal api)",
+          "request": {
+            "method": "POST",
+            "header": [ { "key": "Content-Type", "value": "application/json" } ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"channel\": \"api\",\n  \"contact\": {\n    \"person_name\": \"Maria Silva\",\n    \"person_documentation\": \"00000000000\",\n    \"person_birthday\": \"1990-01-01\",\n    \"phone_number\": \"+5511999999999\"\n  }\n}"
+            },
+            "url": { "raw": "{{runner_base_url}}/flows/{{flow_id}}/execute", "host": ["{{runner_base_url}}"], "path": ["flows", "{{flow_id}}", "execute"] },
+            "description": "Modo headless — Runner não envia mensagens automáticas via WhatsApp (exceto steps acceptance). Resposta traz current_step.url. Ver docs/04-canais.md."
           }
         },
         {
@@ -124,6 +158,28 @@
             "method": "GET",
             "header": [],
             "url": { "raw": "{{runner_base_url}}/executions/{{execution_id}}/steps", "host": ["{{runner_base_url}}"], "path": ["executions", "{{execution_id}}", "steps"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Runner — Webhooks",
+      "item": [
+        {
+          "name": "Webhook de assinatura (Tavola)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Content-Hmac", "value": "SHA256=<hex>" }
+            ],
+            "auth": { "type": "noauth" },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event\": {\n    \"name\": \"sign\",\n    \"data\": {\n      \"signer\": {\n        \"key\": \"<signer_key>\",\n        \"phone_number\": \"+5511999999999\"\n      }\n    }\n  },\n  \"document\": {\n    \"key\": \"<document_key>\"\n  }\n}"
+            },
+            "url": { "raw": "{{runner_base_url}}/webhooks/signature", "host": ["{{runner_base_url}}"], "path": ["webhooks", "signature"] },
+            "description": "Endpoint inbound chamado pelo Tavola — mantido aqui como referência do payload, não faz parte do fluxo normal de uma empresa integradora. Sempre responde 200 (processed/ignored); 401 indica HMAC inválido."
           }
         }
       ]

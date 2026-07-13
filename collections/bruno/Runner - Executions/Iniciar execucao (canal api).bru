@@ -1,7 +1,7 @@
 meta {
-  name: Iniciar execução (execute)
+  name: Iniciar execução (canal api)
   type: http
-  seq: 1
+  seq: 4
 }
 
 post {
@@ -12,6 +12,7 @@ post {
 
 body:json {
   {
+    "channel": "api",
     "contact": {
       "person_name": "Maria Silva",
       "person_documentation": "00000000000",
@@ -22,7 +23,5 @@ body:json {
 }
 
 docs {
-  Ponto de entrada para a empresa integradora iniciar uma execução — não chame o Sequencer diretamente para isso.
-
-  Aceita "channel": "whatsapp" (padrão, omitido aqui) ou "api" (headless) — ver request "Iniciar execução (canal api)".
+  Modo headless — Runner não envia mensagens automáticas via WhatsApp (exceto steps acceptance). A resposta traz current_step.url para você entregar ao contato. Ver docs/04-canais.md.
 }

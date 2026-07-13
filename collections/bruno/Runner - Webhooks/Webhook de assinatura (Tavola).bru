@@ -1,0 +1,36 @@
+meta {
+  name: Webhook de assinatura (Tavola)
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{runner_base_url}}/webhooks/signature
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Hmac: SHA256=<hex>
+}
+
+body:json {
+  {
+    "event": {
+      "name": "sign",
+      "data": {
+        "signer": {
+          "key": "<signer_key>",
+          "phone_number": "+5511999999999"
+        }
+      }
+    },
+    "document": {
+      "key": "<document_key>"
+    }
+  }
+}
+
+docs {
+  Endpoint inbound, chamado pelo Tavola — não faz parte do fluxo normal de uma empresa integradora. Mantido aqui como referência do payload. Sempre responde 200 (status: processed ou ignored); 401 indica HMAC inválido.
+}

@@ -61,6 +61,12 @@
       "name": "Runner — Executions"
     },
     {
+      "_id": "fld_runner_webhooks",
+      "_type": "request_group",
+      "parentId": "wrk_clickflow",
+      "name": "Runner — Webhooks"
+    },
+    {
       "_id": "fld_health",
       "_type": "request_group",
       "parentId": "wrk_clickflow",
@@ -104,7 +110,7 @@
       "_id": "req_update_flow",
       "_type": "request",
       "parentId": "fld_sequencer_flows",
-      "name": "Atualizar flow (somente draft)",
+      "name": "Atualizar flow (draft ou unpublished)",
       "method": "PUT",
       "url": "{{ _.sequencer_base_url }}/flows/{{ _.flow_id }}",
       "headers": [
@@ -123,6 +129,24 @@
       "name": "Publicar flow",
       "method": "PATCH",
       "url": "{{ _.sequencer_base_url }}/flows/{{ _.flow_id }}/publish",
+      "headers": [ { "name": "Authorization", "value": "{{ _.access_token }}" } ]
+    },
+    {
+      "_id": "req_unpublish_flow",
+      "_type": "request",
+      "parentId": "fld_sequencer_flows",
+      "name": "Despublicar flow",
+      "method": "PATCH",
+      "url": "{{ _.sequencer_base_url }}/flows/{{ _.flow_id }}/unpublish",
+      "headers": [ { "name": "Authorization", "value": "{{ _.access_token }}" } ]
+    },
+    {
+      "_id": "req_delete_flow",
+      "_type": "request",
+      "parentId": "fld_sequencer_flows",
+      "name": "Remover flow",
+      "method": "DELETE",
+      "url": "{{ _.sequencer_base_url }}/flows/{{ _.flow_id }}",
       "headers": [ { "name": "Authorization", "value": "{{ _.access_token }}" } ]
     },
     {
@@ -169,6 +193,22 @@
       }
     },
     {
+      "_id": "req_execute_api_channel",
+      "_type": "request",
+      "parentId": "fld_runner_executions",
+      "name": "Iniciar execução (canal api)",
+      "method": "POST",
+      "url": "{{ _.runner_base_url }}/flows/{{ _.flow_id }}/execute",
+      "headers": [
+        { "name": "Authorization", "value": "{{ _.access_token }}" },
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"channel\": \"api\",\n  \"contact\": {\n    \"person_name\": \"Maria Silva\",\n    \"person_documentation\": \"00000000000\",\n    \"person_birthday\": \"1990-01-01\",\n    \"phone_number\": \"+5511999999999\"\n  }\n}"
+      }
+    },
+    {
       "_id": "req_execution_head",
       "_type": "request",
       "parentId": "fld_runner_executions",
@@ -185,6 +225,22 @@
       "method": "GET",
       "url": "{{ _.runner_base_url }}/executions/{{ _.execution_id }}/steps",
       "headers": [ { "name": "Authorization", "value": "{{ _.access_token }}" } ]
+    },
+    {
+      "_id": "req_webhook_signature",
+      "_type": "request",
+      "parentId": "fld_runner_webhooks",
+      "name": "Webhook de assinatura (Tavola)",
+      "method": "POST",
+      "url": "{{ _.runner_base_url }}/webhooks/signature",
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" },
+        { "name": "Content-Hmac", "value": "SHA256=<hex>" }
+      ],
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"event\": {\n    \"name\": \"sign\",\n    \"data\": {\n      \"signer\": {\n        \"key\": \"<signer_key>\",\n        \"phone_number\": \"+5511999999999\"\n      }\n    }\n  },\n  \"document\": {\n    \"key\": \"<document_key>\"\n  }\n}"
+      }
     },
     {
       "_id": "req_health_sequencer",

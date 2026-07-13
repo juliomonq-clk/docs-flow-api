@@ -1,5 +1,5 @@
 meta {
-  name: Atualizar flow (somente draft)
+  name: Atualizar flow (draft ou unpublished)
   type: http
   seq: 4
 }
@@ -18,5 +18,5 @@ body:json {
 }
 
 docs {
-  Retorna 403 se o flow não estiver em draft (definição imutável após publish).
+  Retorna 403 se o flow estiver published. Despublique antes com "Despublicar flow" para voltar a editar.
 }
