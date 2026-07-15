@@ -32,3 +32,9 @@ Com o time de Professional Services da Clicksign: `professionalservices@clicksig
 
 **Onde estão as coleções para testar sem escrever código?**
 Em [`../collections/`](../collections/README.md) — OpenAPI, Postman, Insomnia e Bruno.
+
+**Dá para colocar mais de um documento no mesmo envelope de assinatura?**
+Sim. O `context` do step `signature` tem um campo `documents` (array) — cada item é um documento, com `kind: "file"` (referência S3, via `s3_bucket`+`s3_key`) ou `kind: "template"` (modelo do motor de assinatura legado, via `template_key`). Um mesmo `documents[]` pode misturar os dois `kind`, e todos compartilham o mesmo `folder_key` (campo irmão de `documents`, não aninhado em cada item). Veja os exemplos `signature_file`/`signature_template`/`signature_mixed` em [`clickflow-sequencer-v1.openapi.json`](../collections/openapi/clickflow-sequencer-v1.openapi.json) e detalhe em [`02-conceitos-e-modelo-de-dados.md`](02-conceitos-e-modelo-de-dados.md).
+
+**Consigo ter etapas da mesma esteira preenchidas por pessoas diferentes, cada uma no seu WhatsApp?**
+Sim, sem precisar criar execuções separadas. O `context` de um step `form` aceita um campo `contact` (`person_name`, `person_documentation`, `person_birthday`, `phone_number`) que sobrescreve, a partir daquele step, o contato definido na abertura da execução — o Runner passa a entregar aquele formulário para o novo `phone_number`. No spec, esse exemplo é rotulado `form_contact` / "Form — atualização de contato". **Atenção:** não confundir com o exemplo `form_forward_fill_contact` / "Injeção do contato no formulário" — nome parecido, mas esse outro só pré-preenche campos do formulário com o contato já existente (via `context_map_keys` e placeholders `{{person_name}}` etc.), sem trocar quem recebe a mensagem. Veja [`02-conceitos-e-modelo-de-dados.md`](02-conceitos-e-modelo-de-dados.md).

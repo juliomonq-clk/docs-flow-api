@@ -89,7 +89,8 @@
           "400": { "description": "Bad Request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/handler.ErrorResponse" } } } },
           "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/handler.ErrorUnauthorizedResponse" } } } },
           "403": { "description": "Forbidden — flow está published (despublique antes de editar)", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/handler.ErrorResponse" } } } },
-          "404": { "description": "Not Found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/handler.ErrorResponse" } } } }
+          "404": { "description": "Not Found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/handler.ErrorResponse" } } } },
+          "409": { "description": "Conflict — presente numa geração mais recente do spec (15/07/2026), causa não detalhada na fonte; distinto do 403 (flow published)", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/handler.ErrorResponse" } } } }
         }
       },
       "delete": {

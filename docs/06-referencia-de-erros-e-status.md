@@ -30,7 +30,7 @@
 | `401 Unauthorized` | Qualquer rota autenticada do Sequencer; `POST /webhooks/signature` (Runner) | Token ausente/inválido na introspecção; ou HMAC inválido no webhook |
 | `403 Forbidden` | `PUT /flows/{id}` | Tentativa de editar um Flow `published` (despublique antes) |
 | `404 Not Found` | `GET/PUT/DELETE /flows/{id}`, `GET/POST .../executions`, `GET /executions/{execution_id}` (Sequencer e Runner) | Recurso não encontrado |
-| `409 Conflict` | `PATCH /flows/{id}/publish`, `PATCH /flows/{id}/unpublish`, `POST /executions/{execution_id}/next` | Flow já está no status alvo, ou execução não está em um estado que permite avançar |
+| `409 Conflict` | `PUT /flows/{id}`, `PATCH /flows/{id}/publish`, `PATCH /flows/{id}/unpublish`, `POST /executions/{execution_id}/next` | Flow já está no status alvo, ou execução não está em um estado que permite avançar. **`PUT /flows/{id}` ganhou esse código numa geração de contrato mais recente (15/07/2026) sem detalhar a causa** — distinto do `403` (que já é conhecido: editar um Flow `published`); não confirmado com o time técnico o que dispara especificamente o `409` aqui |
 | `500 Internal Server Error` | Rotas do Runner | Erro interno do serviço |
 | `503 Service Unavailable` | `GET/POST /flows`, `GET /flows/{id}/executions`, `GET /health` (Sequencer) | Dependência essencial indisponível (ex: DynamoDB) |
 
