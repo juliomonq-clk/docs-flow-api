@@ -73,13 +73,41 @@ Cada item da lista `steps[]` de um Flow tem:
   ```json
   { "type": "kyc", "context": { "type": "customer" } }
   ```
-- **`signature`**: `context = { folder_key, documents[] }`, validado no **Runner**, não no Sequencer. Cada item de `documents[]` é um arquivo já existente no S3 (`kind: "file"`, com `s3_bucket`, `s3_key`, `filename`) ou gerado a partir de um modelo Távola (`kind: "template"`, com `template_key`, `filename`) — os dois tipos podem ser combinados na mesma lista. `filename` aceita interpolação de placeholders (ex: `doc_{{person_name}}.docx`).
+- **`signature`**: `context = { folder_key, documents[], signers[]? }`, validado no **Runner**, não no Sequencer. Cada item de `documents[]` é um arquivo já existente no S3 (`kind: "file"`, com `s3_bucket`, `s3_key`, `filename`) ou gerado a partir de um modelo Távola (`kind: "template"`, com `template_key`, `filename`) — os dois tipos podem ser combinados na mesma lista. `filename` aceita interpolação de placeholders (ex: `doc_{{person_name}}.docx`).
   ```json
   { "type": "signature", "context": {
     "folder_key": "1fb29ab8-84c4-4856-be37-5fce0f17c11a",
     "documents": [ { "kind": "template", "template_key": "uuid-do-modelo-tavola", "filename": "contrato-proposta.docx" } ]
   } }
   ```
+  - **`signers[]` — signatários fixos/extras e ordem de assinatura** *(novo, 16/07/2026, ver exemplo `signature_signers_extras` em [`clickflow-sequencer-v1.openapi.json`](../collections/openapi/clickflow-sequencer-v1.openapi.json))*: array opcional, irmão de `documents`/`folder_key`, para adicionar ao envelope signatários além do contato dinâmico da execução — ex.: testemunha, fiador, segundo signatário com identidade fixa. Como `context` é schema livre, não há definição formal desses campos; os observados no exemplo são:
+
+    | Campo | Observado | Papel provável |
+    |---|---|---|
+    | `name` / `documentation` / `birthday` / `phone_number` | fixo ou via placeholder `{{person_x}}` | Identidade — mesma interpolação usada em `filename`/`context_map_keys` |
+    | `email` | só no signatário fixo | Opcional |
+    | `auths[]` | `handwritten`, `liveness`, `whatsapp` | Método(s) de autenticação da assinatura, por signatário |
+    | `roles[]` | `witness`, `sign` | Papel — só esses dois valores confirmados |
+    | `group` | inteiro (`1`, `2` no exemplo), default `1` | **Confirmado na doc do Távola:** ordem de assinatura — signatários de `group` maior só assinam depois que **todos** os de `group` menor tiverem assinado (bloqueio sequencial real) |
+    | `refusable` | `false` no exemplo, default `false` | Se o signatário pode recusar o documento |
+    | `has_documentation` | `true` no exemplo; **default no Távola é `true`** | Se CPF e data de nascimento são exigidos do signatário |
+    | `location_required_enabled` | `true` no exemplo, default `false` | Exige compartilhar localização no momento da assinatura |
+    | `communicate_events` | só no signatário fixo | Mapa evento → canal — enum exato: `signature_request` aceita `email`/`sms`/`whatsapp`/`none`; `signature_reminder` aceita `none`/`email`; `document_signed` aceita `email`/`whatsapp`. Todos com default `email` |
+
+    > **Estes campos são nativos do motor de assinatura legado (Távola)**, repassados via `context` sem validação própria do Sequencer/Runner. `group`/`communicate_events`/`refusable`/`has_documentation`/`location_required_enabled` foram confirmados consultando [developers.clicksign.com](https://developers.clicksign.com/reference/signatario-campos-e-regras-de-negocio) diretamente (16/07/2026). `auths[]` e `roles[]` mapeiam pros sistemas de "Requisito de Autenticação" (17+ valores possíveis no Távola: `email`, `sms`, `whatsapp`, `address_proof`, `liveness`, `official_document`, `selfie`, `facial_biometrics`, `biometric`, `identity_biometrics`, `documentscopy`, `handwritten`, `auto_signature`, `presential`, `icp_brasil`, `pix`, `embedded_signature`) e "Requisito de Qualificação" (~70 valores, ex. `sign`/`witness`/`approve`/`party`/`account_holder`) do Távola — o exemplo do ClickFlow só usa um subconjunto pequeno de cada, e não está confirmado se o ClickFlow repassa qualquer valor do universo Távola ou só os já vistos.
+    >
+    > **Notificação por e-mail funciona** — confirmado para um signatário com `email` explícito em `signers[]` (o exemplo do contrato usa `email: "signatario.fixo@mail.com"` no signatário fixo, com `communicate_events` mapeando eventos pro canal `"email"`). **Para o signatário dinâmico, hoje não dá** — confirmado com o time de engenharia da Clicksign (16/07/2026): o `contact` da execução não tem campo `email`, e não existe hoje um mecanismo de puxar dado de um `form` anterior (e-mail ou qualquer outro campo) para dentro de `signers[]`. É uma melhoria conhecida — mapear campo de formulário para campo do signatário via placeholder (ex. `{{campo-do-form-com-nome}}`), permitindo N signatários dinâmicos — mas ainda não implementada.
+
+    ```json
+    { "type": "signature", "context": {
+      "folder_key": "1fb29ab8-84c4-4856-be37-5fce0f17c11a",
+      "documents": [ { "kind": "template", "template_key": "uuid-do-modelo-tavola", "filename": "{{person_name}}.docx" } ],
+      "signers": [
+        { "name": "Testemunha Fixa", "documentation": "34623794024", "birthday": "2021-07-15", "phone_number": "49999999999", "email": "testemunha@exemplo.com", "auths": ["handwritten"], "roles": ["witness"], "group": 1, "refusable": false, "has_documentation": true, "location_required_enabled": true, "communicate_events": { "document_signed": "email", "signature_reminder": "email", "signature_request": "email" } },
+        { "name": "{{person_name}}", "documentation": "{{person_documentation}}", "birthday": "{{person_birthday}}", "phone_number": "{{phone_number}}", "auths": ["liveness", "whatsapp"], "roles": ["sign"], "group": 2 }
+      ]
+    } }
+    ```
 
 Mais exemplos (aceite, form encadeado, verify com form, assinatura mista) estão nos `examples` de `POST /flows` em [`../collections/openapi/clickflow-sequencer-v1.openapi.json`](../collections/openapi/clickflow-sequencer-v1.openapi.json).
 
