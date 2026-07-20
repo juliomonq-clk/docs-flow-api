@@ -73,7 +73,7 @@ Cada item da lista `steps[]` de um Flow tem:
   ```json
   { "type": "kyc", "context": { "type": "customer" } }
   ```
-- **`signature`**: `context = { folder_key, documents[], signers[]? }`, validado no **Runner**, não no Sequencer. Cada item de `documents[]` é um arquivo já existente no S3 (`kind: "file"`, com `s3_bucket`, `s3_key`, `filename`) ou gerado a partir de um modelo Távola (`kind: "template"`, com `template_key`, `filename`) — os dois tipos podem ser combinados na mesma lista. `filename` aceita interpolação de placeholders (ex: `doc_{{person_name}}.docx`).
+- **`signature`**: `context = { folder_key?, documents[], signers[]? }`, validado no **Runner**, não no Sequencer. `folder_key` é **opcional** (confirmado com engenharia e em testes, 20/07/2026) — se omitido, o documento é criado na pasta raiz da conta no Távola. Cada item de `documents[]` é um arquivo já existente no S3 (`kind: "file"`, com `s3_bucket`, `s3_key`, `filename`) ou gerado a partir de um modelo Távola (`kind: "template"`, com `template_key`, `filename`) — os dois tipos podem ser combinados na mesma lista. `filename` aceita interpolação de placeholders (ex: `doc_{{person_name}}.docx`).
   ```json
   { "type": "signature", "context": {
     "folder_key": "1fb29ab8-84c4-4856-be37-5fce0f17c11a",
