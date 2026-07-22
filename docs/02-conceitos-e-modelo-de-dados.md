@@ -77,20 +77,22 @@ Cada item da lista `steps[]` de um Flow tem:
 
   > **⚠️ Mudança de estrutura (22/07/2026).** `folder_key` **saiu do nível do `context` e passou a viver dentro de um novo objeto `settings`**. Toda a documentação anterior (até 20/07/2026) descrevia `folder_key` como campo irmão direto de `documents[]`/`signers[]` — o novo exemplo do contrato `signature_envelope_settings`, e a releitura de todos os demais exemplos de `signature` (`signature_file`, `signature_template`, `signature_mixed`, `signature_filename_interpolado`, `signature_signers_extras`), confirmam que **todos** agora aninham `folder_key` em `settings.folder_key`. Ainda **não confirmado com engenharia** se a forma antiga (`context.folder_key` flat) continua aceita por compatibilidade ou se deixou de funcionar — até essa confirmação, gerar payloads novos sempre com `settings.folder_key`.
 
-  `settings` é opcional (como antes, com `folder_key` sozinho). O exemplo `signature_envelope_settings` revela mais 7 campos novos no mesmo objeto — nomes indicam configuração do envelope de assinatura no Távola, semântica não confirmada com engenharia (só inferida do nome/tipo do campo, mesmo tratamento dado a `signers[]` em 16/07/2026):
+  `settings` é opcional (como antes, com `folder_key` sozinho). O exemplo `signature_envelope_settings` revela mais 7 campos novos no mesmo objeto. **Confirmado, não mais inferido (achado 22/07/2026):** esses 7 nomes batem exatamente com o critério de aceite da história de backlog **AVL-3507/AVL-3227** ("[Flow] Permitir configurar parâmetros de Envelope e Documento na etapa de Assinatura", status Jira "Em teste" em 22/07/2026), cujo AC foi escrito com base no levantamento real da API do Távola — isso também confirma os enums, mais restritos do que o exemplo isolado sugeria:
 
-  | Campo | Tipo (observado) | Papel provável |
+  | Campo | Tipo | Papel |
   |---|---|---|
-  | `folder_key` | string (UUID) | Pasta do Távola onde o documento é criado. **Opcional** (confirmado 20/07/2026) — se omitido, vai para a pasta raiz da conta |
-  | `auto_close` | boolean | Fechar o envelope automaticammente assim que todos assinarem, sem ação manual |
-  | `block_after_refusal` | boolean | Bloquear o envelope após uma recusa de assinatura |
-  | `deadline_at` | string (ISO 8601, ex. `2026-07-30T15:30:00Z`) | Prazo final para assinatura |
-  | `default_message` | string | Mensagem padrão enviada ao(s) signatário(s) |
-  | `default_subject` | string | Assunto padrão da notificação/e-mail do envelope |
-  | `locale` | string (ex. `en-US`) | Idioma da experiência de assinatura |
-  | `remind_interval` | string/number (ex. `"2"`) | Intervalo (dias, presumido) entre lembretes automáticos de assinatura |
+  | `folder_key` | string (UUID) | Pasta do Távola onde o documento é criado. **Opcional** (confirmado 20/07/2026) — se omitido, vai para a pasta raiz da conta. **⚠️ Não faz parte do AC da AVL-3227** (que lista "Pasta de Armazenamento" como fora de escopo) — discrepância a confirmar com engenharia, não é decisão deliberada conhecida |
+  | `auto_close` | boolean | Encerra o envelope automaticamente após a última assinatura |
+  | `block_after_refusal` | boolean | Pausa o fluxo em caso de recusa de um signatário |
+  | `deadline_at` | string (ISO 8601) | Data limite — **confirmado: até 90 dias** |
+  | `default_message` | string | Corpo da comunicação enviada aos signatários |
+  | `default_subject` | string | Assunto da comunicação enviada aos signatários |
+  | `locale` | string | **Confirmado: só `pt-BR` ou `en-US`** — não é string livre |
+  | `remind_interval` | string/number | **Confirmado: só `null`/`1`/`2`/`3`/`7`/`14` (dias)** — intervalo de lembrete automático, não é string livre |
 
-  > Nenhum destes 7 campos é obrigatório — o exemplo do contrato os usa todos juntos, mas `context` continua schema-livre (`additionalProperties`). Não incluir um campo que o cliente/PS não pediu explicitamente.
+  **Campo do AC ainda não observado em nenhum exemplo do contrato:** `deadline_partial_signature_action` (`closed`/`canceled` — comportamento ao bater o prazo sem todas as assinaturas). Não assumir implementado só porque o resto do AC apareceu — status Jira ainda é "Em teste", não "Finalizado". "Observadores" (watchers do envelope) também faz parte do AC da AVL-3227, mas é modelado como endpoint próprio (`POST /envelopes/{id}/signature_watchers`), não como campo de `context.settings` — não confundir os dois.
+
+  > Nenhum dos 7 campos observados é obrigatório — o exemplo do contrato os usa todos juntos, mas `context` continua schema-livre (`additionalProperties`). Não incluir um campo que o cliente/PS não pediu explicitamente.
 
   ```json
   { "type": "signature", "context": {
