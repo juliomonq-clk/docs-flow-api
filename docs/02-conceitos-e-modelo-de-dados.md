@@ -73,14 +73,49 @@ Cada item da lista `steps[]` de um Flow tem:
   ```json
   { "type": "kyc", "context": { "type": "customer" } }
   ```
-- **`signature`**: `context = { folder_key?, documents[], signers[]? }`, validado no **Runner**, não no Sequencer. `folder_key` é **opcional** (confirmado com engenharia e em testes, 20/07/2026) — se omitido, o documento é criado na pasta raiz da conta no Távola. Cada item de `documents[]` é um arquivo já existente no S3 (`kind: "file"`, com `s3_bucket`, `s3_key`, `filename`) ou gerado a partir de um modelo Távola (`kind: "template"`, com `template_key`, `filename`) — os dois tipos podem ser combinados na mesma lista. `filename` aceita interpolação de placeholders: de contato (ex: `doc_{{person_name}}.docx`) e/ou da **key/id de um campo respondido num `form` anterior da mesma esteira**, combináveis no mesmo nome (ex: `{{campo-nome-1231242}}-{{person_name}}.docx` — confirmado por Julio, 21/07/2026; ver também o exemplo do contrato `signature_filename_interpolado`, `doc_{{person_name}}_{{field-key-do-version}}.docx`).
+- **`signature`**: `context = { documents[], settings?, signers[]? }`, validado no **Runner**, não no Sequencer. Cada item de `documents[]` é um arquivo já existente no S3 (`kind: "file"`, com `s3_bucket`, `s3_key`, `filename?`) ou gerado a partir de um modelo Távola (`kind: "template"`, com `template_key`, `filename?`) — os dois tipos podem ser combinados na mesma lista. `filename` é **opcional** (confirmado por Julio, 22/07/2026) — se omitido, o sistema cria o documento com um nome padrão; quando informado, aceita interpolação de placeholders: de contato (ex: `doc_{{person_name}}.docx`) e/ou da **key/id de um campo respondido num `form` anterior da mesma esteira**, combináveis no mesmo nome (ex: `{{campo-nome-1231242}}-{{person_name}}.docx` — confirmado por Julio, 21/07/2026; ver também o exemplo do contrato `signature_filename_interpolado`, `doc_{{person_name}}_{{field-key-do-version}}.docx`).
+
+  > **⚠️ Mudança de estrutura (22/07/2026).** `folder_key` **saiu do nível do `context` e passou a viver dentro de um novo objeto `settings`**. Toda a documentação anterior (até 20/07/2026) descrevia `folder_key` como campo irmão direto de `documents[]`/`signers[]` — o novo exemplo do contrato `signature_envelope_settings`, e a releitura de todos os demais exemplos de `signature` (`signature_file`, `signature_template`, `signature_mixed`, `signature_filename_interpolado`, `signature_signers_extras`), confirmam que **todos** agora aninham `folder_key` em `settings.folder_key`. Ainda **não confirmado com engenharia** se a forma antiga (`context.folder_key` flat) continua aceita por compatibilidade ou se deixou de funcionar — até essa confirmação, gerar payloads novos sempre com `settings.folder_key`.
+
+  `settings` é opcional (como antes, com `folder_key` sozinho). O exemplo `signature_envelope_settings` revela mais 7 campos novos no mesmo objeto — nomes indicam configuração do envelope de assinatura no Távola, semântica não confirmada com engenharia (só inferida do nome/tipo do campo, mesmo tratamento dado a `signers[]` em 16/07/2026):
+
+  | Campo | Tipo (observado) | Papel provável |
+  |---|---|---|
+  | `folder_key` | string (UUID) | Pasta do Távola onde o documento é criado. **Opcional** (confirmado 20/07/2026) — se omitido, vai para a pasta raiz da conta |
+  | `auto_close` | boolean | Fechar o envelope automaticammente assim que todos assinarem, sem ação manual |
+  | `block_after_refusal` | boolean | Bloquear o envelope após uma recusa de assinatura |
+  | `deadline_at` | string (ISO 8601, ex. `2026-07-30T15:30:00Z`) | Prazo final para assinatura |
+  | `default_message` | string | Mensagem padrão enviada ao(s) signatário(s) |
+  | `default_subject` | string | Assunto padrão da notificação/e-mail do envelope |
+  | `locale` | string (ex. `en-US`) | Idioma da experiência de assinatura |
+  | `remind_interval` | string/number (ex. `"2"`) | Intervalo (dias, presumido) entre lembretes automáticos de assinatura |
+
+  > Nenhum destes 7 campos é obrigatório — o exemplo do contrato os usa todos juntos, mas `context` continua schema-livre (`additionalProperties`). Não incluir um campo que o cliente/PS não pediu explicitamente.
+
   ```json
   { "type": "signature", "context": {
-    "folder_key": "1fb29ab8-84c4-4856-be37-5fce0f17c11a",
-    "documents": [ { "kind": "template", "template_key": "uuid-do-modelo-tavola", "filename": "contrato-proposta.docx" } ]
+    "documents": [ { "kind": "template", "template_key": "uuid-do-modelo-tavola", "filename": "contrato-proposta.docx" } ],
+    "settings": { "folder_key": "1fb29ab8-84c4-4856-be37-5fce0f17c11a" }
   } }
   ```
-  - **`signers[]` — signatários fixos/extras e ordem de assinatura** *(novo, 16/07/2026, ver exemplo `signature_signers_extras` em [`clickflow-sequencer-v1.openapi.json`](../collections/openapi/clickflow-sequencer-v1.openapi.json))*: array opcional, irmão de `documents`/`folder_key`, para adicionar ao envelope signatários além do contato dinâmico da execução — ex.: testemunha, fiador, segundo signatário com identidade fixa. Como `context` é schema livre, não há definição formal desses campos; os observados no exemplo são:
+
+  Exemplo completo de configurações de envelope (`signature_envelope_settings`):
+  ```json
+  { "type": "signature", "context": {
+    "documents": [ { "kind": "template", "template_key": "uuid-do-modelo-tavola", "filename": "{{person_name}}_settings.docx" } ],
+    "settings": {
+      "auto_close": false,
+      "block_after_refusal": false,
+      "deadline_at": "2026-07-30T15:30:00Z",
+      "default_message": "Envelope com configurações extras",
+      "default_subject": "Aplicação de parâmetros extras no envelope",
+      "folder_key": "1fb29ab8-84c4-4856-be37-5fce0f17c11a",
+      "locale": "en-US",
+      "remind_interval": "2"
+    }
+  } }
+  ```
+  - **`signers[]` — signatários fixos/extras e ordem de assinatura** *(novo, 16/07/2026, ver exemplo `signature_signers_extras` em [`clickflow-sequencer-v1.openapi.json`](../collections/openapi/clickflow-sequencer-v1.openapi.json))*: array opcional, irmão de `documents`/`settings`, para adicionar ao envelope signatários além do contato dinâmico da execução — ex.: testemunha, fiador, segundo signatário com identidade fixa. Como `context` é schema livre, não há definição formal desses campos; os observados no exemplo são:
 
     | Campo | Observado | Papel provável |
     |---|---|---|
@@ -100,8 +135,8 @@ Cada item da lista `steps[]` de um Flow tem:
 
     ```json
     { "type": "signature", "context": {
-      "folder_key": "1fb29ab8-84c4-4856-be37-5fce0f17c11a",
       "documents": [ { "kind": "template", "template_key": "uuid-do-modelo-tavola", "filename": "{{person_name}}.docx" } ],
+      "settings": { "folder_key": "1fb29ab8-84c4-4856-be37-5fce0f17c11a" },
       "signers": [
         { "name": "Testemunha Fixa", "documentation": "34623794024", "birthday": "2021-07-15", "phone_number": "49999999999", "email": "testemunha@exemplo.com", "auths": ["handwritten"], "roles": ["witness"], "group": 1, "refusable": false, "has_documentation": true, "location_required_enabled": true, "communicate_events": { "document_signed": "email", "signature_reminder": "email", "signature_request": "email" } },
         { "name": "{{person_name}}", "documentation": "{{person_documentation}}", "birthday": "{{person_birthday}}", "phone_number": "{{phone_number}}", "auths": ["liveness", "whatsapp"], "roles": ["sign"], "group": 2 }

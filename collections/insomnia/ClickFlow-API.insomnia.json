@@ -94,7 +94,7 @@
       ],
       "body": {
         "mimeType": "application/json",
-        "text": "{\n  \"name\": \"Onboarding de colaborador\",\n  \"steps\": [\n    { \"type\": \"form\", \"context\": { \"version_key\": \"<version_key do formulário>\" } },\n    { \"type\": \"verify\", \"context\": { \"authentication\": \"liveness\" } },\n    { \"type\": \"signature\", \"context\": { \"folder_key\": \"<referência da pasta>\", \"documents\": [ { \"kind\": \"template\", \"template_key\": \"<uuid do modelo Távola>\", \"filename\": \"contrato.docx\" } ] } }\n  ]\n}"
+        "text": "{\n  \"name\": \"Onboarding de colaborador\",\n  \"steps\": [\n    { \"type\": \"form\", \"context\": { \"version_key\": \"<version_key do formulário>\" } },\n    { \"type\": \"verify\", \"context\": { \"authentication\": \"liveness\" } },\n    { \"type\": \"signature\", \"context\": { \"documents\": [ { \"kind\": \"template\", \"template_key\": \"<uuid do modelo Távola>\", \"filename\": \"contrato.docx\" } ], \"settings\": { \"folder_key\": \"<referência da pasta>\" } } }\n  ]\n}"
       }
     },
     {

@@ -18,7 +18,7 @@ Content-Type: application/json
   "steps": [
     { "type": "form", "context": { "version_key": "<version_key do formulário ClickForm>" } },
     { "type": "verify", "context": { "authentication": "liveness" } },
-    { "type": "signature", "context": { "folder_key": "<referência da pasta>", "documents": [ { "kind": "template", "template_key": "<uuid do modelo Távola>", "filename": "contrato.docx" } ] } }
+    { "type": "signature", "context": { "documents": [ { "kind": "template", "template_key": "<uuid do modelo Távola>", "filename": "contrato.docx" } ], "settings": { "folder_key": "<referência da pasta>" } } }
   ]
 }
 ```
