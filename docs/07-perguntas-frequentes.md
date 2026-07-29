@@ -21,6 +21,9 @@ Consulte `GET /executions/{execution_id}/steps` no Runner. Cada item retorna o t
 **O que é o step `kyc`?**
 Checagem de conhecimento de cliente, adicionada ao contrato em 13/07/2026. `context = { type: "business" | "customer" }` — CNPJ ou CPF, respectivamente. Normalmente vem depois de um `verify`. Veja [`02-conceitos-e-modelo-de-dados.md`](02-conceitos-e-modelo-de-dados.md).
 
+**Quais opções de autenticação o step `verify` aceita?** *(atualizado 29/07/2026)*
+Três: `liveness` (prova de vida facial), `biometric_behavior` (biometria comportamental, com alerta de fraude `identity_fraudsters_result`) e `identity_biometrics` (mesmo provedor Único, sem o alerta de fraude — retorna `risk_score` de 0 a 100 quando o resultado é `inconclusive`). Veja [`02-conceitos-e-modelo-de-dados.md`](02-conceitos-e-modelo-de-dados.md).
+
 **Como remover um Flow que não uso mais?**
 `DELETE /flows/{id}` no Sequencer — é um soft delete (`status: "deleted"`), não afeta execuções já criadas a partir dele.
 

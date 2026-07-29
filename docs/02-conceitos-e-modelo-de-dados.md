@@ -62,7 +62,7 @@ Cada item da lista `steps[]` de um Flow tem:
       }
     } }
     ```
-- **`verify`**: `context = { authentication, contact_fields_map? }`, com `authentication: "liveness"` ou `"biometric_behavior"`. Quando combinado com um `form` anterior, `contact_fields_map` casa o campo de identidade com a chave do campo do form onde ele foi coletado — mapa `campo_identidade → chave_do_campo_no_form`:
+- **`verify`**: `context = { authentication, contact_fields_map? }`, com `authentication: "liveness"`, `"biometric_behavior"` ou `"identity_biometrics"` *(novo, 29/07/2026)*. `identity_biometrics` usa o mesmo provedor (Único) e formato de request que `biometric_behavior`, mas sem o sinal de alerta de fraude (`identity_fraudsters_result`) — em vez disso, retorna `risk_score` (0-100) quando o resultado é `inconclusive`. Quando combinado com um `form` anterior, `contact_fields_map` casa o campo de identidade com a chave do campo do form onde ele foi coletado — mapa `campo_identidade → chave_do_campo_no_form`:
   ```json
   { "type": "verify", "context": {
     "authentication": "biometric_behavior",
