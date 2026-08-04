@@ -38,6 +38,8 @@
 
 `POST /webhooks/signature` recebe callbacks do Tavola e sempre responde `200` com `status: "processed"` (evento `sign` avançou o step) ou `status: "ignored"` (evento não é `sign`, ou `signer_key` não corresponde a nenhum step do flow) — isso evita retries desnecessários do lado do Tavola. Um `401` indica falha na validação do header `Content-Hmac`.
 
+> **O que hoje cai em `ignored`** (levantado em 03/08/2026): o Távola dispara, além de `sign`, os eventos `refusal` (documento recusado), `deadline` (data limite atingida), `cancel` (cancelado manualmente), `close`, `auto_close` e `document_closed`. **Todos chegam neste endpoint e são descartados** — só `sign` avança o step. Consequência prática para quem integra: **uma execução cujo envelope foi recusado ou venceu permanece em andamento indefinidamente**, sem sinal de encerramento. Já está definido que a execução passará a encerrar como não concluída, com motivo distinto por evento (recusa, prazo vencido, cancelado), exceto quando o envelope está configurado com `block_after_refusal: true` — caso em que fica em espera explícita aguardando ação do operador no Távola. **Ainda não implementado** — não construir integração que dependa desse sinal hoje.
+
 ## Separação entre erro de negócio e erro técnico
 
 Ao investigar uma falha, é importante distinguir:

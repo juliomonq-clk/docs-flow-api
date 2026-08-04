@@ -62,7 +62,10 @@ Cada item da lista `steps[]` de um Flow tem:
       }
     } }
     ```
-- **`verify`**: `context = { authentication, contact_fields_map? }`, com `authentication: "liveness"`, `"biometric_behavior"` ou `"identity_biometrics"` *(novo, 29/07/2026)*. `identity_biometrics` usa o mesmo provedor (Único) e formato de request que `biometric_behavior`, mas sem o sinal de alerta de fraude (`identity_fraudsters_result`) — em vez disso, retorna `risk_score` (0-100) quando o resultado é `inconclusive`. Quando combinado com um `form` anterior, `contact_fields_map` casa o campo de identidade com a chave do campo do form onde ele foi coletado — mapa `campo_identidade → chave_do_campo_no_form`:
+- **`verify`**: `context = { authentication, contact_fields_map? }`, com `authentication: "liveness"`, `"biometric_behavior"` ou `"identity_biometrics"` *(novo, 29/07/2026)*.
+  > **⚠️ O Orquestrador não valida `authentication`** (confirmado 03/08/2026) — ele repassa o valor opaco, sem lista fechada. Qualquer string é aceita na publicação, mas **só esses três valores têm tratamento de retorno**. Um valor fora deles não gera erro ao publicar: o step simplesmente não funciona em execução. Cabe a quem monta o fluxo informar um valor vigente e suportado.
+  >
+  > Comportamento de resultado: **resultado inconclusivo não encerra a execução** em nenhum dos tipos; **reprovação encerra a execução e não há nova tentativa**. Encadear `identity_biometrics` com um step `kyc` **não é suportado** — o KYC depende do sinal de alerta de fraude (`identity_fraudsters_result`), que só o `biometric_behavior` produz; a combinação falha em execução, não na publicação. `identity_biometrics` usa o mesmo provedor (Único) e formato de request que `biometric_behavior`, mas sem o sinal de alerta de fraude (`identity_fraudsters_result`) — em vez disso, retorna `risk_score` (0-100) quando o resultado é `inconclusive`. Quando combinado com um `form` anterior, `contact_fields_map` casa o campo de identidade com a chave do campo do form onde ele foi coletado — mapa `campo_identidade → chave_do_campo_no_form`:
   ```json
   { "type": "verify", "context": {
     "authentication": "biometric_behavior",
@@ -81,16 +84,19 @@ Cada item da lista `steps[]` de um Flow tem:
 
   | Campo | Tipo | Papel |
   |---|---|---|
-  | `folder_key` | string (UUID) | Pasta do Távola onde o documento é criado. **Opcional** (confirmado 20/07/2026) — se omitido, vai para a pasta raiz da conta. **⚠️ Não faz parte do AC da AVL-3227** (que lista "Pasta de Armazenamento" como fora de escopo) — discrepância a confirmar com engenharia, não é decisão deliberada conhecida |
-  | `auto_close` | boolean | Encerra o envelope automaticamente após a última assinatura |
-  | `block_after_refusal` | boolean | Pausa o fluxo em caso de recusa de um signatário |
-  | `deadline_at` | string (ISO 8601) | Data limite — **confirmado: até 90 dias** |
-  | `default_message` | string | Corpo da comunicação enviada aos signatários |
-  | `default_subject` | string | Assunto da comunicação enviada aos signatários |
-  | `locale` | string | **Confirmado: só `pt-BR` ou `en-US`** — não é string livre |
-  | `remind_interval` | string/number | **Confirmado: só `null`/`1`/`2`/`3`/`7`/`14` (dias)** — intervalo de lembrete automático, não é string livre |
+  | `folder_key` | string (UUID) | Pasta do Távola onde o documento é criado. **Opcional** — se omitido, vai para a pasta raiz da conta. **Capacidade oficial da esteira** (confirmado 03/08/2026). Aceita duas formas: `context.settings.folder_key` (**canônica**) e `context.folder_key` no nível do `context` (**forma antiga, mantida por retrocompatibilidade** — não usar em fluxo novo) |
+  | `auto_close` | boolean | Encerra o envelope automaticamente após a última assinatura. **Default: `true`** |
+  | `block_after_refusal` | boolean | Pausa o fluxo em caso de recusa de um signatário. **Default: `false`** |
+  | `deadline_at` | string (ISO 8601) | Data limite — **máximo 90 dias**, deve ser futuro. **Default: 30 dias** a partir da criação |
+  | `default_message` | string | Corpo da comunicação enviada aos signatários. Default: vazio |
+  | `default_subject` | string | Assunto da comunicação enviada aos signatários. **Máximo 100 caracteres. Default: `null`** |
+  | `locale` | string | **Só `pt-BR` ou `en-US`** — não é string livre. **Default: `pt-BR`.** Não há herança do idioma configurado na conta para envelope criado via API — conta que precisa de inglês declara `locale` no fluxo |
+  | `remind_interval` | string/number | **Só `null`/`1`/`2`/`3`/`7`/`14` (dias)** — intervalo de lembrete automático, não é string livre. **Default: `3`.** `null` é valor válido e significa "não lembrar" |
+  | `deadline_partial_signature_action` | string | Comportamento ao bater o prazo sem todas as assinaturas: `closed` ou `canceled`. **Default: `null`** |
 
-  **Campo do AC ainda não observado em nenhum exemplo do contrato:** `deadline_partial_signature_action` (`closed`/`canceled` — comportamento ao bater o prazo sem todas as assinaturas). Não assumir implementado só porque o resto do AC apareceu — status Jira ainda é "Em teste", não "Finalizado". "Observadores" (watchers do envelope) também faz parte do AC da AVL-3227, mas é modelado como endpoint próprio (`POST /envelopes/{id}/signature_watchers`), não como campo de `context.settings` — não confundir os dois.
+  > **Defaults confirmados em 03/08/2026** na doc oficial do Távola (`developers.clicksign.com`, página *Envelope: campos e regras de negócio*). Nenhum campo de `settings` é obrigatório — **quando o campo não é enviado, vale o default do Távola acima**, não um valor injetado pela esteira.
+
+  **~~Campo do AC ainda não observado em nenhum exemplo do contrato:~~ Resolvido em 03/08/2026** — `deadline_partial_signature_action` é campo real do Távola, confirmado na doc oficial (`closed`/`canceled`, default `null`), já incorporado à tabela acima. Não aparecer em exemplo do ClickFlow significa apenas que nenhum exemplo o exercita. *(nota histórica preservada abaixo)* — status Jira ainda é "Em teste", não "Finalizado". "Observadores" (watchers do envelope) também faz parte do AC da AVL-3227, mas é modelado como endpoint próprio (`POST /envelopes/{id}/signature_watchers`), não como campo de `context.settings` — não confundir os dois.
 
   > Nenhum dos 7 campos observados é obrigatório — o exemplo do contrato os usa todos juntos, mas `context` continua schema-livre (`additionalProperties`). Não incluir um campo que o cliente/PS não pediu explicitamente.
 
