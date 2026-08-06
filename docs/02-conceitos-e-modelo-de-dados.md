@@ -107,6 +107,10 @@ Cada item da lista `steps[]` de um Flow tem:
   } }
   ```
 
+  > **Nome do envelope — comportamento padrão, não configurável (mudou em 04/08/2026).** Não existe campo de nome de envelope no `context`. O envelope criado pela esteira é nomeado automaticamente como `{nome do Flow} - {identificação do contato} - {dd-mm-aaaa HHhMM}`, onde a identificação do contato é o `person_name` do `contact` da execução ou, na ausência dele, o `phone_number`, e o horário é o da criação do envelope no fuso `America/Sao_Paulo` (ex.: `Proposta Crédito - Maria Silva - 31-07-2026 14h32`). O formato anterior, `Esteira {FlowID} | Execução {ExecutionID}`, deixou de ser usado — integrações que dependiam de parsear aquele padrão precisam se ajustar.
+  >
+  > **Limites de tamanho:** ao importar esses valores para dentro do nome do envelope, o nome do Flow é truncado em **45 caracteres** e o nome do contato em **55**, o que mantém o nome final em no máximo 122 caracteres. **Isso não é um limite do campo `name` do Flow** — ele continua aceito e devolvido na íntegra pela API; o corte existe apenas na composição do nome do envelope. Um nome de Flow mais longo que 45 caracteres não causa erro, mas a parte excedente não aparece no envelope: prefira nomes de Flow curtos e distintivos se quiser reconhecê-los na listagem do motor de assinatura.
+
   Exemplo completo de configurações de envelope (`signature_envelope_settings`):
   ```json
   { "type": "signature", "context": {
