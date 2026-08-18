@@ -6,6 +6,12 @@ Não, hoje não. A definição de um Flow é feita via API (JSON), com apoio do 
 **Consigo editar um Flow depois de publicado?**
 Não diretamente — uma tentativa de `PUT` num Flow `published` retorna `403`. Mas desde 13/07/2026 dá para despublicar (`PATCH /flows/{id}/unpublish`), editar e publicar de novo, sem precisar criar um Flow novo. Isso garante que execuções já em andamento não sejam afetadas por uma mudança no meio do caminho. Veja [`02-conceitos-e-modelo-de-dados.md`](02-conceitos-e-modelo-de-dados.md).
 
+**Qual a diferença entre os steps `acceptance` e `consent`?**
+`acceptance` é avanço de jornada: uma mensagem no WhatsApp com um botão de continuar. Serve para confirmar que a pessoa viu algo e seguir adiante — **não registra aceite de nada**. `consent` *(disponível desde 18/08/2026)* é aceite formal: apresenta o termo, oferece aceitar ou recusar, e registra o desfecho (aceito, recusado ou expirado), sendo que recusa e expiração encerram a jornada. Os dois convivem e nenhum substitui o outro. Regra prática: se o passo só precisa que a pessoa siga, use `acceptance`; se existe um termo cujo aceite ou recusa precisa ficar registrado, use `consent`. Veja [`02-conceitos-e-modelo-de-dados.md`](02-conceitos-e-modelo-de-dados.md).
+
+**O step `consent` gera um PDF do termo aceito?**
+Não. A evidência do aceite é o retorno estruturado do módulo (com o registro do desfecho e do momento), não um documento anexo. Se o seu fluxo também precisa de um documento assinado, isso vem do step `signature`, que é outra etapa — aceite e assinatura eletrônica são coisas distintas, com valor jurídico distinto.
+
 **Preciso integrar direto com o Sequencer?**
 Não necessariamente. O início e o acompanhamento do dia a dia de uma execução acontecem pelo **Runner**. O Sequencer é consultado quando você precisa do estado consolidado da execução ou quer forçar o avanço manual de um step.
 

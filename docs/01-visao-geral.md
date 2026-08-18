@@ -28,7 +28,8 @@ Essa separação é uma decisão de arquitetura deliberada: qualquer módulo pod
 
 Um Flow é uma sequência de *steps*. Os tipos suportados atualmente são:
 
-- **`acceptance`** — aceite rápido de um termo/condição (ex: aceite de novos termos), sem geração de documento completo.
+- **`acceptance`** — confirmação de leitura e avanço da jornada: mensagem no WhatsApp seguida de um botão de continuar. **Não é aceite formal de nada** — não registra concordância com um termo.
+- **`consent`** *(novo, 18/08/2026)* — **aceite formal** de um termo: o conteúdo do termo é apresentado ao contato, com botões de aceitar e recusar, e o desfecho (aceito, recusado ou expirado) fica registrado. É o módulo de Aceite. **Não confundir com `acceptance`:** os dois convivem, e nenhum substitui o outro. Se o passo só precisa que a pessoa siga adiante, é `acceptance`; se existe um termo cujo aceite ou recusa precisa ficar registrado, é `consent`.
 - **`form`** — coleta de dados estruturados (módulo ClickForm).
 - **`verify`** — autenticação do usuário (liveness e/ou biometria comportamental).
 - **`kyc`** *(novo, 13/07/2026)* — checagem de conhecimento de cliente (KYC), para pessoa física (`customer`) ou jurídica (`business`), tipicamente encadeada após um `verify`.

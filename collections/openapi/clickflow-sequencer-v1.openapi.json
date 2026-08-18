@@ -38,6 +38,8 @@
               "schema": { "$ref": "#/components/schemas/handler.CreateFlowBody" },
               "examples": {
                 "acceptance": { "summary": "Acceptance", "value": { "name": "Proposta Crédito — acceptance", "steps": [ { "type": "acceptance", "context": { "template_key": "chave-do-template", "accept_replies": ["accept", "aceitar"] } } ] } },
+                "consent": { "summary": "Consent", "value": { "name": "Proposta Crédito — consent", "steps": [ { "type": "consent", "context": { "channel_type": "whatsapp", "template_id": "seu-template-id" } } ] } },
+                "consent_variables": { "summary": "Consent — variáveis por step (channel_params)", "value": { "name": "Proposta Crédito — consent com variáveis", "steps": [ { "type": "consent", "context": { "channel_type": "whatsapp", "template_id": "seu-template-id", "channel_params": { "steps": [ { "step_id": "apresentacao", "variables": { "body": ["{{person_name}}", "Carro Azul", "{{chave-do-campo-do-form}}"], "header": [] } } ] } } } ] } },
                 "form": { "summary": "Form", "value": { "name": "Proposta Crédito — form", "steps": [ { "type": "form", "context": { "version_key": "sua-form-version-key" } } ] } },
                 "form_contact": { "summary": "Form — atualização de contato", "value": { "name": "Proposta Crédito — form com atualização de contato", "steps": [ { "type": "form", "context": { "version_key": "a0cfcec8-4d18-49a8-b6d1-85df293d5cb4", "contact": { "person_name": "...", "person_documentation": "...", "person_birthday": "...", "phone_number": "..." } } } ] } },
                 "form_forward_fill": { "summary": "Form — injeção de respostas de formulários anteriores", "value": { "name": "Injeção de respostas de formulários anteriores", "steps": [ { "type": "form", "context": { "version_key": "versao-formulario-cadastro" } }, { "type": "form", "context": { "version_key": "versao-formulario-confirmacao", "context_map_keys": { "nome-completo-confirmacao": { "read_only": false, "value": "nome-completo-cadastro" }, "email-confirmacao": { "read_only": true, "value": "email-cadastro" }, "whatsapp-confirmacao": { "read_only": true, "value": "whatsapp-cadastro" }, "campo-destino-formulario-atual": { "read_only": false, "value": "campo-origem" } } } } ] } },
@@ -227,8 +229,8 @@
       },
       "domain.FlowStepType": {
         "type": "string",
-        "enum": ["acceptance", "form", "verify", "kyc", "signature"],
-        "x-enum-varnames": ["FlowStepTypeAcceptance", "FlowStepTypeForm", "FlowStepTypeVerify", "FlowStepTypeKYC", "FlowStepTypeSignature"]
+        "enum": ["acceptance", "form", "verify", "kyc", "signature", "consent"],
+        "x-enum-varnames": ["FlowStepTypeAcceptance", "FlowStepTypeForm", "FlowStepTypeVerify", "FlowStepTypeKYC", "FlowStepTypeSignature", "FlowStepTypeConsent"]
       },
       "domain.FlowStep": {
         "type": "object",

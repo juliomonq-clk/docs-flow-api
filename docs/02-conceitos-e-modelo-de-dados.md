@@ -39,7 +39,7 @@ Cada item da lista `steps[]` de um Flow tem:
 
 | Campo | Descrição |
 |---|---|
-| `type` | `acceptance` \| `form` \| `verify` \| `kyc` \| `signature` |
+| `type` | `acceptance` \| `consent` \| `form` \| `verify` \| `kyc` \| `signature` |
 | `context` | Objeto de configuração específico do tipo (schema livre por tipo) |
 
 ### Regras de validação e campos por tipo
@@ -48,6 +48,39 @@ Cada item da lista `steps[]` de um Flow tem:
   ```json
   { "type": "acceptance", "context": { "template_key": "chave-do-template", "accept_replies": ["accept", "aceitar"] } }
   ```
+  > `acceptance` é avanço de jornada (mensagem + botão de continuar), **não aceite formal**. Para registrar concordância com um termo, use `consent` — ver abaixo. Os dois tipos convivem; nenhum substitui o outro.
+
+- **`consent`** *(novo, 18/08/2026)*: `context = { channel_type, template_id, channel_params?, metadata? }`. Aciona o módulo de Aceite, que apresenta o termo ao contato e registra o desfecho.
+
+  | Campo | Obrigatório | O que é |
+  |---|---|---|
+  | `channel_type` | sim | Canal de entrega. **Único valor válido hoje: `whatsapp`** |
+  | `template_id` | sim | Template previamente cadastrado no módulo de Aceite |
+  | `channel_params` | não | Valores das variáveis do template, por passo — ver estrutura abaixo |
+  | `metadata` | não | Chave-valor livre que compõe o relatório final do aceite (ex: identificador de pedido) |
+
+  Forma mínima:
+  ```json
+  { "type": "consent", "context": { "channel_type": "whatsapp", "template_id": "seu-template-id" } }
+  ```
+
+  Com variáveis de template (`channel_params`):
+  ```json
+  { "type": "consent", "context": {
+      "channel_type": "whatsapp",
+      "template_id": "seu-template-id",
+      "channel_params": { "steps": [
+        { "step_id": "apresentacao",
+          "variables": { "body": ["{{person_name}}", "Carro Azul", "{{chave-do-campo-do-form}}"], "header": [] } }
+      ] }
+  } }
+  ```
+  - `channel_params.steps[].step_id` identifica um passo **dentro do template** do módulo de Aceite (um template pode ter mais de um passo — apresentação, decisão), não o índice do step no Flow. Um único step `consent` pode alimentar variáveis de vários passos do template.
+  - `variables` traz `body` e `header`, os dois arrays, **posicionais**: a ordem de cada item corresponde à ordem dos marcadores no template do WhatsApp. `header` pode vir vazio.
+  - Cada posição aceita **placeholder de contato** (`{{person_name}}`, `{{person_documentation}}`, `{{person_birthday}}`, `{{phone_number}}`), **texto literal** e a **key de um campo respondido num `form` anterior** da mesma esteira — combináveis na mesma lista.
+  - Desfechos possíveis do step: **aceito**, **recusado** e **expirado**. Recusa e expiração encerram a jornada; aceite avança para o próximo step.
+  - O módulo **não gera PDF** — a evidência do aceite é o retorno estruturado, não um documento anexo.
+  - `execution_id` e `webhook_url` são injetados pelo Runner em tempo de execução e **não** são configuráveis no JSON do Flow.
 - **`form`**: `context = { version_key, contact?, context_map_keys? }`. `version_key` identifica a versão do formulário (módulo ClickForm) a ser exibido.
   ```json
   { "type": "form", "context": { "version_key": "sua-form-version-key" } }
@@ -187,6 +220,7 @@ O Sequencer expõe duas formas de representar uma execução:
   | Campo | Descrição |
   |---|---|
   | `execution_id` / `flow_id` | Referências ao Flow e à execução |
+  | `account` | *(novo, 18/08/2026)* Conta dona da execução: `{ id, key, name }` — `id` inteiro, `key` e `name` strings |
   | `status` | Ver seção de estados, abaixo — **atenção**: o enum do Runner só tem `running`, `completed`, `failed` (sem `waiting`) |
   | `channel` | `whatsapp` \| `api` — canal definido no `POST /execute`, ver [`04-canais.md`](04-canais.md) |
   | `current_step` | `{ id, type, url }` do passo em andamento. Presente só quando `channel = "api"` e há um step `RUNNING`. `url` é `null` para `acceptance` |

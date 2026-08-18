@@ -146,12 +146,22 @@
           "url": { "type": "string", "nullable": true, "description": "Link para o contato acessar. null para acceptance.", "example": "https://app.clicksign.com/notarial/widget/signatures/uuid/redirect" }
         }
       },
+      "domain.ExecutionAccount": {
+        "type": "object",
+        "description": "Conta dona da execução (novo em 18/08/2026).",
+        "properties": {
+          "id": { "type": "integer" },
+          "key": { "type": "string" },
+          "name": { "type": "string" }
+        }
+      },
       "http.executionResponse": {
         "type": "object",
         "description": "Resposta de POST /execute (201) e de GET /executions/{execution_id} (200) — schema unificado desde 13/07/2026 (antes, POST tinha um schema reduzido próprio).",
         "properties": {
           "execution_id": { "type": "string" },
           "flow_id": { "type": "string" },
+          "account": { "allOf": [ { "$ref": "#/components/schemas/domain.ExecutionAccount" } ], "description": "Conta dona da execução — novo em 18/08/2026." },
           "status": { "type": "string", "enum": ["running", "completed", "failed"], "example": "running", "description": "⚠️ Divergência observada: o Runner não expõe o estado `waiting` que existe no Sequencer (domain.ExecutionStatus tem 4 valores: running/waiting/completed/failed). Ver docs/02-conceitos-e-modelo-de-dados.md." },
           "channel": { "type": "string", "enum": ["whatsapp", "api"], "example": "whatsapp", "description": "Canal definido no POST /execute. \"whatsapp\": Runner gerencia envio de mensagens. \"api\": cliente gerencia entrega dos links." },
           "current_step": { "allOf": [ { "$ref": "#/components/schemas/http.currentStepResp" } ] },
