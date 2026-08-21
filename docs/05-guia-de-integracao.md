@@ -75,6 +75,25 @@ Resposta:
 
 A partir deste ponto, o consumidor final (`Maria Silva`) recebe a primeira etapa da jornada pelo WhatsApp, no número informado. Esse `POST` aceita também `"channel": "api"` para o modo headless, sem envio automático de mensagens — ver [`04-canais.md`](04-canais.md).
 
+### 3.1. Enviar o documento a assinar no próprio disparo *(novo, 21/08/2026)*
+
+Quando o documento é gerado pelo seu sistema no momento do disparo (proposta calculada, contrato montado pelo ERP), declare no Flow um slot `kind: "runner_files"` e mande o conteúdo em `files[]` no `execute`:
+
+```http
+POST {{runner_base_url}}/flows/{flow_id}/execute
+Authorization: <token>
+Content-Type: application/json
+
+{
+  "contact": { "person_name": "Maria Silva", "phone_number": "+5511999999999" },
+  "files": [
+    { "key": "1", "content_base_64": "data:application/pdf;base64,JVBERi0xLjQK..." }
+  ]
+}
+```
+
+O `files[].key` casa com o `documents[].key` do slot declarado no step `signature` do Flow; o nome do arquivo vem do `filename` do Flow, não do disparo. `content_base_64` é a **data-URL completa** (com o `data:<mime>;base64,` na frente), não o base64 cru. Campo opcional e aditivo — omitir mantém o comportamento anterior. Detalhe do modelo em [`02-conceitos-e-modelo-de-dados.md`](02-conceitos-e-modelo-de-dados.md).
+
 > Se o Flow tiver um step `signature`, o avanço para o próximo passo não é automático no `next`: ele depende do Runner receber o webhook de assinatura do Tavola (`POST /webhooks/signature`) confirmando o evento `sign`. Isso é interno ao Runner — a empresa integradora não precisa configurar nada, mas explica por que uma execução pode ficar em `waiting`/`running` até a assinatura ser concluída no Tavola.
 
 ## 4. Acompanhar o progresso

@@ -109,7 +109,7 @@ Cada item da lista `steps[]` de um Flow tem:
   ```json
   { "type": "kyc", "context": { "type": "customer" } }
   ```
-- **`signature`**: `context = { documents[], settings?, signers[]? }`, validado no **Runner**, não no Sequencer. Cada item de `documents[]` é um arquivo já existente no S3 (`kind: "file"`, com `s3_bucket`, `s3_key`, `filename?`) ou gerado a partir de um modelo Távola (`kind: "template"`, com `template_key`, `filename?`) — os dois tipos podem ser combinados na mesma lista. `filename` é **opcional** (confirmado por Julio, 22/07/2026) — se omitido, o sistema cria o documento com um nome padrão; quando informado, aceita interpolação de placeholders: de contato (ex: `doc_{{person_name}}.docx`) e/ou da **key/id de um campo respondido num `form` anterior da mesma esteira**, combináveis no mesmo nome (ex: `{{campo-nome-1231242}}-{{person_name}}.docx` — confirmado por Julio, 21/07/2026; ver também o exemplo do contrato `signature_filename_interpolado`, `doc_{{person_name}}_{{field-key-do-version}}.docx`).
+- **`signature`**: `context = { documents[], settings?, signers[]? }`. A maior parte do `context` é validada no **Runner**, não no Sequencer — **exceções** (validadas no Sequencer, na criação/edição/publicação do Flow, desde 21/08/2026): `settings.deadline_at` e `documents[].kind = "runner_files"`. Cada item de `documents[]` é um arquivo já existente no S3 (`kind: "file"`, com `s3_bucket`, `s3_key`, `filename?`), gerado a partir de um modelo Távola (`kind: "template"`, com `template_key`, `filename?`) ou **um slot preenchido no disparo da execução** (`kind: "runner_files"`, com `key` e `filename` **obrigatórios** — ver bloco abaixo) — os tipos podem ser combinados na mesma lista. `filename` é **opcional** (confirmado por Julio, 22/07/2026) — se omitido, o sistema cria o documento com um nome padrão; quando informado, aceita interpolação de placeholders: de contato (ex: `doc_{{person_name}}.docx`) e/ou da **key/id de um campo respondido num `form` anterior da mesma esteira**, combináveis no mesmo nome (ex: `{{campo-nome-1231242}}-{{person_name}}.docx` — confirmado por Julio, 21/07/2026; ver também o exemplo do contrato `signature_filename_interpolado`, `doc_{{person_name}}_{{field-key-do-version}}.docx`).
 
   > **⚠️ Mudança de estrutura (22/07/2026).** `folder_key` **saiu do nível do `context` e passou a viver dentro de um novo objeto `settings`**. Toda a documentação anterior (até 20/07/2026) descrevia `folder_key` como campo irmão direto de `documents[]`/`signers[]` — o novo exemplo do contrato `signature_envelope_settings`, e a releitura de todos os demais exemplos de `signature` (`signature_file`, `signature_template`, `signature_mixed`, `signature_filename_interpolado`, `signature_signers_extras`), confirmam que **todos** agora aninham `folder_key` em `settings.folder_key`. Ainda **não confirmado com engenharia** se a forma antiga (`context.folder_key` flat) continua aceita por compatibilidade ou se deixou de funcionar — até essa confirmação, gerar payloads novos sempre com `settings.folder_key`.
 
@@ -120,7 +120,7 @@ Cada item da lista `steps[]` de um Flow tem:
   | `folder_key` | string (UUID) | Pasta do Távola onde o documento é criado. **Opcional** — se omitido, vai para a pasta raiz da conta. **Capacidade oficial da esteira** (confirmado 03/08/2026). Aceita duas formas: `context.settings.folder_key` (**canônica**) e `context.folder_key` no nível do `context` (**forma antiga, mantida por retrocompatibilidade** — não usar em fluxo novo) |
   | `auto_close` | boolean | Encerra o envelope automaticamente após a última assinatura. **Default: `true`** |
   | `block_after_refusal` | boolean | Pausa o fluxo em caso de recusa de um signatário. **Default: `false`** |
-  | `deadline_at` | string (ISO 8601) | Data limite — **máximo 90 dias**, deve ser futuro. **Default: 30 dias** a partir da criação |
+  | `deadline_at` | **inteiro (dias)** ou string (ISO 8601) | Prazo de assinatura. Aceita **duas formas** *(desde 21/08/2026)*: **inteiro positivo de dias** (ex.: `30`) — o backend calcula a data absoluta **no disparo da execução** e envia ao Távola em ISO 8601, com **teto de 90 dias** conferido na publicação do Flow; ou **data fixa em ISO 8601** (forma original, mantida sem alteração de comportamento). Não há conversão automática de uma forma para a outra em fluxos já publicados. **Default: 30 dias** a partir da criação |
   | `default_message` | string | Corpo da comunicação enviada aos signatários. Default: vazio |
   | `default_subject` | string | Assunto da comunicação enviada aos signatários. **Máximo 100 caracteres. Default: `null`** |
   | `locale` | string | **Só `pt-BR` ou `en-US`** — não é string livre. **Default: `pt-BR`.** Não há herança do idioma configurado na conta para envelope criado via API — conta que precisa de inglês declara `locale` no fluxo |
@@ -140,6 +140,42 @@ Cada item da lista `steps[]` de um Flow tem:
   } }
   ```
 
+  #### `kind: "runner_files"` — documento enviado no disparo da execução *(novo, 21/08/2026)*
+
+  Os dois `kind` anteriores (`file` e `template`) apontam para algo que **já existe antes de a jornada começar** e são declarados na definição do Flow — logo, iguais em toda execução. `runner_files` cobre o caso em que **o documento é produzido pelo sistema do integrador no momento do disparo**: proposta com valores calculados, contrato montado pelo ERP, relatório gerado sob demanda.
+
+  O modelo é de **slot + preenchimento**, não de substituição:
+
+  1. **No Flow**, o step `signature` declara o slot: `{ "kind": "runner_files", "key": "1", "filename": "contrato.pdf" }`. **`key` e `filename` são obrigatórios** neste `kind` (um base64 não carrega nome nem extensão de onde derivar um padrão) e a validação é feita pelo **Sequencer**, no `POST /flows`, `PUT /flows/{id}` e `PATCH /flows/{id}/publish`.
+  2. **No disparo**, `POST /flows/{flow_id}/execute` (Runner) leva o conteúdo em `files[]`, e o `files[].key` **casa com o `documents[].key`** do slot correspondente. O nome do arquivo vem do Flow, não do disparo.
+
+  | Campo de `files[]` (Runner) | Tipo | Papel |
+  |---|---|---|
+  | `content_base_64` | string | **Data-URL completa**, com o mime embutido — ex.: `data:application/pdf;base64,JVBERi0xLjQK...`. Não é o base64 "cru" |
+  | `key` | string | Chave de correlação com o `documents[].key` do slot declarado no Flow |
+
+  ```json
+  { "type": "signature", "context": {
+    "documents": [ { "kind": "runner_files", "key": "1", "filename": "contrato.pdf" } ],
+    "settings": { "folder_key": "1fb29ab8-84c4-4856-be37-5fce0f17c11a" }
+  } }
+  ```
+
+  ```http
+  POST {{runner_base_url}}/flows/{flow_id}/execute
+
+  {
+    "contact": { "person_name": "Maria Silva", "phone_number": "+5511999999999" },
+    "files": [ { "key": "1", "content_base_64": "data:application/pdf;base64,JVBERi0xLjQK..." } ]
+  }
+  ```
+
+  `files[]` é **opcional e aditivo**: disparo sem o campo mantém exatamente o comportamento anterior. O base64 **morre na borda** — o Runner materializa o arquivo no storage próprio dele e o resto do sistema (Sequencer, registro da execução, chamada ao Távola) continua trafegando apenas referência, preservando o princípio de que API e banco nunca carregam base64.
+
+  A resposta da execução passa a trazer `files[]` com `{ key, url, error }` — a `key` de correlação e uma **URL temporária de leitura**, nunca bucket/S3 key internos nem o conteúdo. `error` vem preenchido (mensagem genérica, sem detalhe interno) quando a geração da URL daquele arquivo falha, para distinguir "sem URL por erro transitório" de item sem URL por outro motivo.
+
+  > **Limite de tamanho — não publicado.** O contrato não declara limite máximo para o conteúdo enviado em `files[]`. Base64 infla o arquivo em cerca de um terço, e a borda do Runner tem um limite real de payload. Confirmar o número com o time técnico antes de prometer a capacidade para documento grande.
+
   > **Nome do envelope — comportamento padrão, não configurável (mudou em 04/08/2026).** Não existe campo de nome de envelope no `context`. O envelope criado pela esteira é nomeado automaticamente como `{nome do Flow} - {identificação do contato} - {dd-mm-aaaa HHhMM}`, onde a identificação do contato é o `person_name` do `contact` da execução ou, na ausência dele, o `phone_number`, e o horário é o da criação do envelope no fuso `America/Sao_Paulo` (ex.: `Proposta Crédito - Maria Silva - 31-07-2026 14h32`). O formato anterior, `Esteira {FlowID} | Execução {ExecutionID}`, deixou de ser usado — integrações que dependiam de parsear aquele padrão precisam se ajustar.
   >
   > **Limites de tamanho:** ao importar esses valores para dentro do nome do envelope, o nome do Flow é truncado em **45 caracteres** e o nome do contato em **55**, o que mantém o nome final em no máximo 122 caracteres. **Isso não é um limite do campo `name` do Flow** — ele continua aceito e devolvido na íntegra pela API; o corte existe apenas na composição do nome do envelope. Um nome de Flow mais longo que 45 caracteres não causa erro, mas a parte excedente não aparece no envelope: prefira nomes de Flow curtos e distintivos se quiser reconhecê-los na listagem do motor de assinatura.
@@ -151,7 +187,7 @@ Cada item da lista `steps[]` de um Flow tem:
     "settings": {
       "auto_close": false,
       "block_after_refusal": false,
-      "deadline_at": "2026-07-30T15:30:00Z",
+      "deadline_at": 30,
       "default_message": "Envelope com configurações extras",
       "default_subject": "Aplicação de parâmetros extras no envelope",
       "folder_key": "1fb29ab8-84c4-4856-be37-5fce0f17c11a",
@@ -225,6 +261,7 @@ O Sequencer expõe duas formas de representar uma execução:
   | `channel` | `whatsapp` \| `api` — canal definido no `POST /execute`, ver [`04-canais.md`](04-canais.md) |
   | `current_step` | `{ id, type, url }` do passo em andamento. Presente só quando `channel = "api"` e há um step `RUNNING`. `url` é `null` para `acceptance` |
   | `contact` | Contato informado (ou atualizado) na execução |
+  | `files[]` | *(novo, 21/08/2026)* Arquivos enviados em base64 no disparo (`files[]` do `POST /execute`), já materializados no storage do Runner: `{ key, url, error }` — só a chave de correlação e uma URL temporária de leitura, nunca bucket/S3 key internos nem o conteúdo. `error` preenchido quando a URL daquele arquivo não pôde ser gerada |
   | `presentation_runner_error` | Objeto livre — presente quando houve falha ao apresentar o step atual ao contato |
   | `whatsapp_presentation_outbound` / `whatsapp_conclusion_outbound` | Objetos livres com metadados do envio da mensagem de apresentação/conclusão via WhatsApp (quando `channel = "whatsapp"`) |
   | `created_at` / `updated_at` | Timestamps |

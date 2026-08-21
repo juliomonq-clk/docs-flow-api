@@ -25,4 +25,6 @@ docs {
   Ponto de entrada para a empresa integradora iniciar uma execução — não chame o Sequencer diretamente para isso.
 
   Aceita "channel": "whatsapp" (padrão, omitido aqui) ou "api" (headless) — ver request "Iniciar execução (canal api)".
+
+  Novo em 21/08/2026: aceita também "files" (array, opcional) para enviar o documento a assinar em base64 no próprio disparo — cada item com "key" (casa com documents[].key do slot kind "runner_files" declarado no step signature do flow) e "content_base_64" (data-URL completa, ex.: "data:application/pdf;base64,..."). Exemplo no OpenAPI do Runner e em docs/05-guia-de-integracao.md.
 }

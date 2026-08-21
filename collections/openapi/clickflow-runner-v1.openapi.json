@@ -31,7 +31,8 @@
               "schema": { "$ref": "#/components/schemas/http.executeRequest" },
               "examples": {
                 "whatsapp": { "summary": "Canal whatsapp (padrão)", "value": { "contact": { "person_name": "Maria Silva", "person_documentation": "00000000000", "person_birthday": "1990-01-01", "phone_number": "+5511999999999" } } },
-                "api": { "summary": "Canal api (headless)", "value": { "channel": "api", "contact": { "person_name": "Maria Silva", "person_documentation": "00000000000", "person_birthday": "1990-01-01", "phone_number": "+5511999999999" } } }
+                "api": { "summary": "Canal api (headless)", "value": { "channel": "api", "contact": { "person_name": "Maria Silva", "person_documentation": "00000000000", "person_birthday": "1990-01-01", "phone_number": "+5511999999999" } } },
+                "runner_files": { "summary": "Documento em base64 no disparo (novo, 21/08/2026)", "value": { "contact": { "person_name": "Maria Silva", "person_documentation": "00000000000", "person_birthday": "1990-01-01", "phone_number": "+5511999999999" }, "files": [ { "key": "1", "content_base_64": "data:application/pdf;base64,JVBERi0xLjQK..." } ] } }
               }
             }
           }
@@ -134,7 +135,29 @@
             "example": "whatsapp",
             "description": "Canal de comunicação da execução.\n\"whatsapp\" (padrão, compatível com versões anteriores): Runner envia mensagens automáticas via WhatsApp em todas as etapas — apresentação, steps form/verify/signature e conclusão. contact.phone_number é obrigatório.\n\"api\": Runner não envia mensagens automáticas. O cliente é responsável por entregar os links ao contato. A resposta inclui o objeto current_step com id, type e url do passo em andamento. contact.phone_number é opcional (exceto para steps acceptance, que sempre exigem WhatsApp).\nOmitir o campo equivale a \"whatsapp\". Qualquer outro valor retorna 400."
           },
-          "contact": { "$ref": "#/components/schemas/domain.Contact" }
+          "contact": { "$ref": "#/components/schemas/domain.Contact" },
+          "files": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/domain.RunnerFileInput" },
+            "description": "Arquivo(s) enviados em base64 no próprio disparo (novo em 21/08/2026). Opcional e aditivo — sem este campo, o comportamento anterior é mantido. Cada item tem content_base_64 (data-URL completa, ex.: \"data:application/pdf;base64,...\") e key — o step signature do fluxo declara documents[].kind \"runner_files\" com o mesmo key para casar o conteúdo com o slot certo (o nome do arquivo é definido no fluxo, em documents[].filename, não aqui). Limite de tamanho não declarado no contrato."
+          }
+        }
+      },
+      "domain.RunnerFileInput": {
+        "type": "object",
+        "description": "Item de files[] no POST /execute (novo em 21/08/2026).",
+        "properties": {
+          "content_base_64": { "type": "string", "description": "Data-URL completa com o mime embutido, não o base64 cru.", "example": "data:application/pdf;base64,JVBERi0xLjQK..." },
+          "key": { "type": "string", "description": "Chave de correlação com documents[].key do slot runner_files declarado no flow.", "example": "1" }
+        }
+      },
+      "http.executionFileResp": {
+        "type": "object",
+        "description": "Item de files[] na resposta de execução (novo em 21/08/2026) — arquivo enviado em base64 no disparo, já materializado no bucket próprio do Runner. Expõe só a key de correlação e uma URL temporária de leitura, nunca bucket/S3 key internos nem o conteúdo.",
+        "properties": {
+          "key": { "type": "string" },
+          "url": { "type": "string", "description": "URL temporária de leitura." },
+          "error": { "type": "string", "description": "Preenchido (mensagem genérica, sem detalhe interno) quando o presign desse arquivo falha — permite distinguir \"sem URL por erro transitório\" de item sem URL por outro motivo, em vez de silêncio." }
         }
       },
       "http.currentStepResp": {
@@ -166,6 +189,7 @@
           "channel": { "type": "string", "enum": ["whatsapp", "api"], "example": "whatsapp", "description": "Canal definido no POST /execute. \"whatsapp\": Runner gerencia envio de mensagens. \"api\": cliente gerencia entrega dos links." },
           "current_step": { "allOf": [ { "$ref": "#/components/schemas/http.currentStepResp" } ] },
           "contact": { "$ref": "#/components/schemas/domain.Contact" },
+          "files": { "type": "array", "items": { "$ref": "#/components/schemas/http.executionFileResp" }, "description": "Arquivos enviados em base64 no disparo (files[]), já materializados no bucket próprio do Runner — novo em 21/08/2026." },
           "created_at": { "type": "string" },
           "updated_at": { "type": "string" },
           "presentation_runner_error": { "type": "object", "additionalProperties": {} },

@@ -12,4 +12,6 @@ delete {
 
 docs {
   Soft delete — o flow passa para status "deleted". Retorna 204 No Content. Não há hard delete no contrato público.
+
+  Novo em 21/08/2026: responde 409 Conflict quando o flow tem execução em andamento — mesma regra que trava a despublicação. Finalize as transações antes de excluir.
 }
