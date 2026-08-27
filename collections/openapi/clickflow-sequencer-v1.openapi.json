@@ -48,8 +48,9 @@
                 "verify_biometric_behavior": { "summary": "Verify — biometric_behavior", "value": { "name": "Proposta Crédito — verify biometric_behavior", "steps": [ { "type": "verify", "context": { "authentication": "biometric_behavior" } } ] } },
                 "verify_biometric_behavior_with_form": { "summary": "Verify — biometric_behavior + form", "value": { "name": "Proposta Crédito — verify biometric_behavior + form", "steps": [ { "type": "form", "context": { "version_key": "sua-form-version-key" } }, { "type": "verify", "context": { "authentication": "biometric_behavior", "contact_fields_map": { "person_name": "field-key-do-nome", "person_documentation": "field-key-do-documento" } } } ] } },
                 "verify_identity_biometrics": { "summary": "Verify — identity_biometrics", "value": { "name": "Proposta Crédito — verify identity_biometrics", "steps": [ { "type": "verify", "context": { "authentication": "identity_biometrics" } } ] } },
-                "kyc_biometric_behavior": { "summary": "KYC — biometric_behavior + kyc (CNPJ)", "value": { "name": "Proposta Crédito — verify biometric_behavior + kyc (CNPJ)", "steps": [ { "type": "verify", "context": { "authentication": "biometric_behavior" } }, { "type": "kyc", "context": { "type": "business" } } ] } },
-                "kyc_form_biometric_behavior": { "summary": "KYC — form + biometric_behavior + kyc (CPF)", "value": { "name": "Proposta Crédito — form + verify biometric_behavior + kyc (CPF)", "steps": [ { "type": "form", "context": { "version_key": "sua-form-version-key" } }, { "type": "verify", "context": { "authentication": "biometric_behavior", "contact_fields_map": { "person_name": "field-key-do-nome", "person_documentation": "field-key-do-documento" } } }, { "type": "kyc", "context": { "type": "customer" } } ] } },
+                "verify_provider_priority": { "summary": "Verify — provider_priority", "value": { "name": "Proposta Crédito — verify provider_priority", "steps": [ { "type": "verify", "context": { "authentication": "liveness", "provider_priority": ["caf", "clearsale"] } } ] } },
+                "kyc_biometric_behavior": { "summary": "KYC — biometric_behavior + kyc (CNPJ)", "value": { "name": "Proposta Crédito — verify biometric_behavior + kyc (CNPJ)", "steps": [ { "type": "verify", "context": { "authentication": "biometric_behavior", "result_policy": "passthrough" } }, { "type": "kyc", "context": { "type": "business" } } ] } },
+                "kyc_form_biometric_behavior": { "summary": "KYC — form + biometric_behavior + kyc (CPF)", "value": { "name": "Proposta Crédito — form + verify biometric_behavior + kyc (CPF)", "steps": [ { "type": "form", "context": { "version_key": "sua-form-version-key" } }, { "type": "verify", "context": { "authentication": "biometric_behavior", "contact_fields_map": { "person_name": "field-key-do-nome", "person_documentation": "field-key-do-documento" }, "result_policy": "passthrough" } }, { "type": "kyc", "context": { "type": "customer" } } ] } },
                 "signature_file": { "summary": "Signature — arquivo S3", "value": { "name": "Proposta Crédito", "steps": [ { "type": "signature", "context": { "documents": [ { "kind": "file", "s3_bucket": "meu-bucket", "s3_key": "caminho/para/contrato.pdf", "filename": "contrato-proposta.pdf" } ], "settings": { "folder_key": "1fb29ab8-84c4-4856-be37-5fce0f17c11a" } } } ] } },
                 "signature_template": { "summary": "Signature — modelo Távola", "value": { "name": "Proposta Crédito — template", "steps": [ { "type": "signature", "context": { "documents": [ { "kind": "template", "template_key": "uuid-do-modelo-tavola", "filename": "contrato-proposta.docx" } ], "settings": { "folder_key": "1fb29ab8-84c4-4856-be37-5fce0f17c11a" } } } ] } },
                 "signature_mixed": { "summary": "Signature — arquivo S3 + modelo Távola", "value": { "name": "Proposta Crédito — arquivo S3 + template", "steps": [ { "type": "signature", "context": { "documents": [ { "kind": "file", "s3_bucket": "meu-bucket", "s3_key": "caminho/para/anexo.pdf", "filename": "anexo.pdf" }, { "kind": "template", "template_key": "uuid-do-modelo-tavola", "filename": "contrato.docx" } ], "settings": { "folder_key": "1fb29ab8-84c4-4856-be37-5fce0f17c11a" } } } ] } },
@@ -189,6 +190,21 @@
           "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/handler.ErrorUnauthorizedResponse" } } } },
           "404": { "description": "Not Found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/handler.ErrorResponse" } } } },
           "409": { "description": "Conflict", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/handler.ErrorResponse" } } } }
+        }
+      }
+    },
+    "/executions/{execution_id}/cancel": {
+      "parameters": [ { "name": "execution_id", "in": "path", "required": true, "description": "Execution ID", "schema": { "type": "string" } } ],
+      "post": {
+        "tags": ["executions"],
+        "summary": "Cancela uma execução em andamento",
+        "description": "Encerra a execução (status canceled) e o passo atual (status canceled). Irreversível; /next passa a retornar 409. Idempotente: repetir sobre execução já cancelada devolve 200 sem alterar estado nem gerar novo evento de auditoria. Novo em 27/08/2026.",
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/handler.ExecutionDetailResponse" } } } },
+          "400": { "description": "Bad Request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/handler.ErrorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/handler.ErrorUnauthorizedResponse" } } } },
+          "404": { "description": "Not Found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/handler.ErrorResponse" } } } },
+          "409": { "description": "Conflict — execução já em outro estado terminal (completed/failed)", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/handler.ErrorResponse" } } } }
         }
       }
     },

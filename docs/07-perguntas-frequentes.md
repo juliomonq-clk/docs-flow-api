@@ -30,6 +30,9 @@ Checagem de conhecimento de cliente, adicionada ao contrato em 13/07/2026. `cont
 **Quais opções de autenticação o step `verify` aceita?** *(atualizado 29/07/2026)*
 Três: `liveness` (prova de vida facial), `biometric_behavior` (biometria comportamental, com alerta de fraude `identity_fraudsters_result`) e `identity_biometrics` (mesmo provedor Único, sem o alerta de fraude — retorna `risk_score` de 0 a 100 quando o resultado é `inconclusive`). Veja [`02-conceitos-e-modelo-de-dados.md`](02-conceitos-e-modelo-de-dados.md).
 
+**Uma reprovação no `verify` sempre encerra a execução?** *(novo, 26/08/2026)*
+Por padrão, sim — e não há nova tentativa. Para que a jornada continue mesmo com o `verify` reprovado, declare `result_policy: "passthrough"` no `context` do step: o step vai a `FAILED` com o código de falha auditado, o template de rejeição não é enviado, e o step seguinte roda. É o que permite que um `kyc` posterior seja o árbitro final da jornada. Omitir o campo mantém o comportamento anterior. Veja [`02-conceitos-e-modelo-de-dados.md`](02-conceitos-e-modelo-de-dados.md).
+
 **Como remover um Flow que não uso mais?**
 `DELETE /flows/{id}` no Sequencer — é um soft delete (`status: "deleted"`), não afeta execuções já criadas a partir dele.
 

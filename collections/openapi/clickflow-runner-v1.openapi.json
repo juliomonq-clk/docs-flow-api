@@ -91,6 +91,22 @@
         }
       }
     },
+    "/executions/{execution_id}/cancel": {
+      "parameters": [ { "name": "execution_id", "in": "path", "required": true, "description": "Execution ID", "schema": { "type": "string" } } ],
+      "post": {
+        "tags": ["executions"],
+        "summary": "Cancela uma execução",
+        "description": "Solicita ao orquestrador o cancelamento da execução (execution_id canônico). Idempotente: repetir o cancelamento sobre uma execução já cancelada não altera o estado nem gera novo evento de auditoria, e devolve 200 novamente. Execução já em outro estado terminal (completed/failed) responde 409. Novo em 27/08/2026.",
+        "responses": {
+          "200": { "description": "OK", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/http.executionResponse" } } } },
+          "400": { "description": "Bad Request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/http.errorResponse" } } } },
+          "401": { "description": "Unauthorized", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/http.errorResponse" } } } },
+          "404": { "description": "Not Found", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/http.errorResponse" } } } },
+          "409": { "description": "Conflict — execução já em outro estado terminal (completed/failed)", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/http.errorResponse" } } } },
+          "500": { "description": "Internal Server Error", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/http.errorResponse" } } } }
+        }
+      }
+    },
     "/health": {
       "get": {
         "tags": ["health"],

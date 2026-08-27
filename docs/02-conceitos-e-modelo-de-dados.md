@@ -95,17 +95,39 @@ Cada item da lista `steps[]` de um Flow tem:
       }
     } }
     ```
-- **`verify`**: `context = { authentication, contact_fields_map? }`, com `authentication: "liveness"`, `"biometric_behavior"` ou `"identity_biometrics"` *(novo, 29/07/2026)*.
+- **`verify`**: `context = { authentication, contact_fields_map?, result_policy?, provider_priority? }`, com `authentication: "liveness"`, `"biometric_behavior"` ou `"identity_biometrics"` *(novo, 29/07/2026)*.
   > **⚠️ O Orquestrador não valida `authentication`** (confirmado 03/08/2026) — ele repassa o valor opaco, sem lista fechada. Qualquer string é aceita na publicação, mas **só esses três valores têm tratamento de retorno**. Um valor fora deles não gera erro ao publicar: o step simplesmente não funciona em execução. Cabe a quem monta o fluxo informar um valor vigente e suportado.
   >
-  > Comportamento de resultado: **resultado inconclusivo não encerra a execução** em nenhum dos tipos; **reprovação encerra a execução e não há nova tentativa**. Encadear `identity_biometrics` com um step `kyc` **não é suportado** — o KYC depende do sinal de alerta de fraude (`identity_fraudsters_result`), que só o `biometric_behavior` produz; a combinação falha em execução, não na publicação. `identity_biometrics` usa o mesmo provedor (Único) e formato de request que `biometric_behavior`, mas sem o sinal de alerta de fraude (`identity_fraudsters_result`) — em vez disso, retorna `risk_score` (0-100) quando o resultado é `inconclusive`. Quando combinado com um `form` anterior, `contact_fields_map` casa o campo de identidade com a chave do campo do form onde ele foi coletado — mapa `campo_identidade → chave_do_campo_no_form`:
+  > Comportamento de resultado: **resultado inconclusivo não encerra a execução** em nenhum dos tipos; **reprovação encerra a execução e não há nova tentativa** — salvo quando o step declara `result_policy: "passthrough"` (ver bloco abaixo, *novo em 26/08/2026*). Encadear `identity_biometrics` com um step `kyc` **não é suportado** — o KYC depende do sinal de alerta de fraude (`identity_fraudsters_result`), que só o `biometric_behavior` produz; a combinação falha em execução, não na publicação. `identity_biometrics` usa o mesmo provedor (Único) e formato de request que `biometric_behavior`, mas sem o sinal de alerta de fraude (`identity_fraudsters_result`) — em vez disso, retorna `risk_score` (0-100) quando o resultado é `inconclusive`. Quando combinado com um `form` anterior, `contact_fields_map` casa o campo de identidade com a chave do campo do form onde ele foi coletado — mapa `campo_identidade → chave_do_campo_no_form`:
   ```json
   { "type": "verify", "context": {
     "authentication": "biometric_behavior",
     "contact_fields_map": { "person_name": "field-key-do-nome", "person_documentation": "field-key-do-documento" }
   } }
   ```
-- **`kyc`** *(novo, 13/07/2026)*: `context = { type }`, com `type: "business"` (CNPJ) ou `"customer"` (CPF). Tipicamente encadeado logo após um `verify`, usando os dados já coletados (do `contact` da execução ou de um `form`/`verify` anterior) para rodar a checagem de conhecimento de cliente.
+
+  > **`provider_priority` — ordem de tentativa dos provedores de identidade** *(novo, 27/08/2026)*. Campo **opcional**, array de strings, do mais para o menos prioritário. A etapa é **pass-through**: o Sequencer repassa a lista ao módulo Verify sem reordenar, sem completar com os provedores faltantes e sem traduzir nomes. **Omitir o campo, ou enviar `[]`, mantém a ordem padrão do serviço** — o campo é aditivo e nenhum fluxo publicado muda de comportamento.
+  >
+  > Três limites que evitam expectativa errada: **só faz diferença onde o tipo de `authentication` aceita dois ou mais provedores**; provedor incompatível com o tipo devolve `400 invalid_provider_in_priority`; e **o campo não volta em nenhuma consulta**, então não serve para auditar qual provedor foi de fato usado.
+  >
+  > **Esta documentação não enumera quais provedores servem para qual tipo**, de propósito: essa matriz pertence ao módulo Verify e mudou sem aviso em agosto/2026. Consulte sempre o contrato vigente dele.
+  >
+  > ```json
+  > { "type": "verify", "context": { "authentication": "liveness", "provider_priority": ["caf", "clearsale"] } }
+  > ```
+
+  > **`result_policy` — política de resultado do step** *(novo, 26/08/2026)*. Campo **opcional**. Único valor documentado: `"passthrough"`.
+  >
+  > Com `result_policy: "passthrough"`, uma reprovação no `verify` marca **o step** como `FAILED`, com o código de falha auditado normalmente (ex.: `verify_biometric_liveness_not_approved`), mas **a execução não é interrompida** e o step seguinte roda. Nesse modo, o template de rejeição do `verify` **não é enviado** no WhatsApp, justamente porque a jornada continua. **Omitir o campo mantém o comportamento atual**, sem nenhuma mudança: step e execução em `FAILED`.
+  >
+  > O caso de uso é o fluxo que combina `verify` + `kyc`: sem o campo, a jornada morre na biometria antes de o motor de KYC avaliar qualquer coisa. Com `passthrough`, o KYC passa a ser o árbitro final. O campo é **genérico de propósito** — descreve o que fazer com o resultado, não qual módulo vem depois —, então vale para qualquer step seguinte, não só `kyc`. Os dois exemplos do contrato que o trazem são `kyc_biometric_behavior` e `kyc_form_biometric_behavior`.
+  ```json
+  { "type": "verify", "context": {
+    "authentication": "biometric_behavior",
+    "result_policy": "passthrough"
+  } }
+  ```
+- **`kyc`** *(novo, 13/07/2026)*: `context = { type }`, com `type: "business"` (CNPJ) ou `"customer"` (CPF). Tipicamente encadeado logo após um `verify`, usando os dados já coletados (do `contact` da execução ou de um `form`/`verify` anterior) para rodar a checagem de conhecimento de cliente. Para que o KYC seja de fato o árbitro final — inclusive quando a biometria anterior reprova —, o `verify` que o precede precisa declarar `result_policy: "passthrough"`; sem isso a execução termina na reprovação da biometria e o `kyc` nunca roda.
   ```json
   { "type": "kyc", "context": { "type": "customer" } }
   ```
@@ -121,7 +143,20 @@ Cada item da lista `steps[]` de um Flow tem:
   | `auto_close` | boolean | Encerra o envelope automaticamente após a última assinatura. **Default: `true`** |
   | `block_after_refusal` | boolean | Pausa o fluxo em caso de recusa de um signatário. **Default: `false`** |
   | `deadline_at` | **inteiro (dias)** ou string (ISO 8601) | Prazo de assinatura. Aceita **duas formas** *(desde 21/08/2026)*: **inteiro positivo de dias** (ex.: `30`) — o backend calcula a data absoluta **no disparo da execução** e envia ao Távola em ISO 8601, com **teto de 90 dias** conferido na publicação do Flow; ou **data fixa em ISO 8601** (forma original, mantida sem alteração de comportamento). Não há conversão automática de uma forma para a outra em fluxos já publicados. **Default: 30 dias** a partir da criação |
+  | `name` | string | **Nome do envelope** criado no Távola. **Opcional e novo em 27/08/2026** — omitir mantém o nome padrão automático (`{nome do Flow} - {contato} - {data/hora}`, comportamento estabelecido em 04/08/2026). Aceita interpolação — ver a nota logo abaixo da tabela |
   | `default_message` | string | Corpo da comunicação enviada aos signatários. Default: vazio |
+
+  > **Interpolação de variáveis em `name`, `default_subject` e `default_message`** *(novo, 27/08/2026)*. Os três campos aceitam marcadores `{{chave}}`, resolvidos no disparo de cada execução — mesma sintaxe já usada em `documents[].filename`. A chave pode ser um **dado do contato** (`{{person_name}}`) ou a **chave de um campo respondido num `form` anterior da mesma esteira**.
+  >
+  > ```json
+  > "settings": {
+  >   "name":            "Envelope {{person_name}} — {{data-contrato}}",
+  >   "default_subject": "Assine seu documento, {{person_name}}",
+  >   "default_message": "Documento referente a {{data-contrato}}."
+  > }
+  > ```
+  >
+  > **Referência a chave inexistente é recusada na publicação do fluxo.** O limite de 100 caracteres de `default_subject` só é verificável na execução quando há interpolação.
   | `default_subject` | string | Assunto da comunicação enviada aos signatários. **Máximo 100 caracteres. Default: `null`** |
   | `locale` | string | **Só `pt-BR` ou `en-US`** — não é string livre. **Default: `pt-BR`.** Não há herança do idioma configurado na conta para envelope criado via API — conta que precisa de inglês declara `locale` no fluxo |
   | `remind_interval` | string/number | **Só `null`/`1`/`2`/`3`/`7`/`14` (dias)** — intervalo de lembrete automático, não é string livre. **Default: `3`.** `null` é valor válido e significa "não lembrar" |
@@ -278,10 +313,11 @@ running ──► waiting ──► running ──► completed
 - `waiting`: a execução está aguardando uma ação externa (ex: resposta do usuário no WhatsApp).
 - `completed`: todos os steps foram concluídos com sucesso.
 - `failed`: a execução foi encerrada sem sucesso.
+- `canceled`: a execução foi **cancelada** antes do fim natural, por `POST /api/v1/executions/{execution_id}/cancel` *(novo em 27/08/2026)*. É estado próprio, e não um `failed` com motivo — cancelamento é distinguível de falha de negócio em qualquer consulta de status. O **step em que a execução parou também vai a `canceled`**.
 
 > **⚠️ Divergência de casing observada.** O spec publicado pelo próprio serviço (`/api/v1/docs/doc.json`) declara os quatro valores em minúsculo (`running`, `waiting`, `completed`, `failed`). Um payload real de produção capturado em 07/07/2026, porém, trouxe o valor em maiúsculo (`"status": "RUNNING"`). Não assuma um casing fixo — trate a comparação de `status` como *case-insensitive* no seu código até essa divergência ser esclarecida com o time técnico do ClickFlow.
 
-> **⚠️ Divergência entre serviços.** O enum acima (`domain.ExecutionStatus`, 4 valores) é o do **Sequencer**. O **Runner** expõe só 3 valores no seu próprio `status` (`running`, `completed`, `failed` — sem `waiting`). Se você só integra com o Runner (fluxo recomendado, ver [`05-guia-de-integracao.md`](05-guia-de-integracao.md)), não espere ver `waiting` na resposta dele; para o estado `waiting`, consulte o Sequencer diretamente (`GET /executions/{execution_id}`).
+> **⚠️ Divergência entre serviços.** O enum acima (`domain.ExecutionStatus`, **5 valores desde 27/08/2026**) é o do **Sequencer**. O **Runner** expõe **4** no seu próprio `status` (`running`, `completed`, `failed`, `canceled` — sem `waiting`). Se você só integra com o Runner (fluxo recomendado, ver [`05-guia-de-integracao.md`](05-guia-de-integracao.md)), não espere ver `waiting` na resposta dele; para o estado `waiting`, consulte o Sequencer diretamente (`GET /executions/{execution_id}`).
 
 ## Como as três entidades se relacionam
 

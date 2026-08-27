@@ -19,6 +19,9 @@
 | `waiting` | Aguardando ação externa (ex: resposta do usuário no WhatsApp). | Somente Sequencer |
 | `completed` | Todos os steps concluídos com sucesso. | Sequencer e Runner |
 | `failed` | Execução encerrada sem sucesso. | Sequencer e Runner |
+| `canceled` | Execução **cancelada** antes do fim natural, via `POST /api/v1/executions/{execution_id}/cancel`. Estado próprio, distinto de `failed`. O step em que ela parou também vai a `canceled`. *(novo em 27/08/2026)* | Sequencer e Runner |
+
+> ⚠️ **Step em `FAILED` não implica execução em `failed`** *(desde 26/08/2026)*. Um step `verify` que declare `result_policy: "passthrough"` vai a `FAILED` quando reprovado, com o código de falha auditado, **sem** encerrar a execução — que segue em `running` e avança para o step seguinte. Quem lê status por step (`GET /executions/{execution_id}/steps`) não deve inferir o desfecho da execução a partir de um step falhado; consulte o status da execução. Ver `result_policy` em [`02-conceitos-e-modelo-de-dados.md`](02-conceitos-e-modelo-de-dados.md).
 
 > ⚠️ O spec do serviço declara os valores em minúsculo, mas já foi observado `"RUNNING"` em maiúsculo num payload real de produção (07/07/2026). Trate como *case-insensitive* até essa divergência ser esclarecida. O Runner, além disso, não expõe `waiting` no seu próprio `status` — só o Sequencer tem os 4 valores. Detalhe em [`02-conceitos-e-modelo-de-dados.md`](02-conceitos-e-modelo-de-dados.md).
 

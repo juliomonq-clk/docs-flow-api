@@ -129,6 +129,24 @@ Authorization: <token>
 
 A execução chega a `completed` quando todos os steps forem concluídos com sucesso, ou a `failed` caso algum step seja encerrado sem sucesso. Veja o detalhamento de estados em [`06-referencia-de-erros-e-status.md`](06-referencia-de-erros-e-status.md).
 
+### Cancelar uma execução em andamento *(novo em 27/08/2026)*
+
+Nem toda jornada deve chegar ao fim: desistência, duplicidade ou dado errado no disparo. Para encerrar antes do fim natural:
+
+```http
+POST {{runner_base_url}}/executions/{execution_id}/cancel
+Authorization: <token>
+```
+
+A execução **e o step em que ela parou** vão para `canceled` — estado próprio, distinto de `completed` e de `failed`. A resposta devolve o estado atualizado da execução.
+
+Quatro pontos que evitam erro de integração:
+
+- **É irreversível.** Não existe retomar a mesma execução: para continuar, dispare uma nova. Depois do cancelamento,  responde `409`.
+- **É idempotente.** Cancelar de novo uma execução já cancelada devolve `200`, sem alterar estado e sem gerar novo registro de auditoria — reenvio por timeout é seguro.
+- **`409 Conflict`** só acontece quando a execução já está em **outro** estado terminal (`completed`/`failed`).
+- **Não propaga para fora da esteira.** Se o step de assinatura já criou o envelope no Távola, ele **continua ativo e assinável** — cancelá-lo é ação à parte. Os dados já coletados seguem consultáveis por `GET /executions/{execution_id}/steps`.
+
 Se o Flow em si não for mais necessário (ex: substituído por uma nova versão), remova-o:
 
 ```http
