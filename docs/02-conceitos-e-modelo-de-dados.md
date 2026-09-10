@@ -121,6 +121,8 @@ Cada item da lista `steps[]` de um Flow tem:
   > Com `result_policy: "passthrough"`, uma reprovação no `verify` marca **o step** como `FAILED`, com o código de falha auditado normalmente (ex.: `verify_biometric_liveness_not_approved`), mas **a execução não é interrompida** e o step seguinte roda. Nesse modo, o template de rejeição do `verify` **não é enviado** no WhatsApp, justamente porque a jornada continua. **Omitir o campo mantém o comportamento atual**, sem nenhuma mudança: step e execução em `FAILED`.
   >
   >   O caso de uso é o fluxo que combina `verify` + `kyc`: sem o campo, a jornada morre na biometria antes de o motor de KYC avaliar qualquer coisa. Com `passthrough`, o KYC passa a ser o árbitro final. O campo é **genérico de propósito** — descreve o que fazer com o resultado, não qual módulo vem depois —, então vale para qualquer step seguinte, não só `kyc`. Os dois exemplos do contrato que o trazem são `kyc_biometric_behavior` e `kyc_form_biometric_behavior`.
+  >
+  > **⚠️ `passthrough` cobre reprovação, não falha operacional do provedor.** Se o Verify devolve um estado de falha operacional (processamento interrompido, sem resultado) ou um `result` incompleto (ex.: só o sinal de `liveness` presente, sem o de identidade), o step e a execução falham **mesmo com `result_policy: "passthrough"` declarado** — não há resultado para o módulo seguinte arbitrar, e um `passthrough` que engolisse esse caso trocaria uma falha clara por uma obscura no step seguinte. Só a reprovação (resultado negativo válido, ex. liveness reprovado com sinal completo) é absorvida pelo `passthrough`.
   ```json
   { "type": "verify", "context": {
     "authentication": "biometric_behavior",

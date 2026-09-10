@@ -33,6 +33,9 @@ Três: `liveness` (prova de vida facial), `biometric_behavior` (biometria compor
 **Uma reprovação no `verify` sempre encerra a execução?** *(novo, 26/08/2026)*
 Por padrão, sim — e não há nova tentativa. Para que a jornada continue mesmo com o `verify` reprovado, declare `result_policy: "passthrough"` no `context` do step: o step vai a `FAILED` com o código de falha auditado, o template de rejeição não é enviado, e o step seguinte roda. É o que permite que um `kyc` posterior seja o árbitro final da jornada. Omitir o campo mantém o comportamento anterior. Veja [`02-conceitos-e-modelo-de-dados.md`](02-conceitos-e-modelo-de-dados.md).
 
+**`result_policy: "passthrough"` cobre qualquer problema no `verify`?**
+Não. Cobre reprovação (resultado negativo válido, ex.: liveness reprovado com sinal completo). Não cobre falha operacional do provedor — se o `verify` não produz resultado (processamento interrompido) ou produz um resultado incompleto, o step e **a execução** falham, mesmo com `passthrough` declarado. A lógica: sem um resultado completo, não há o que o step seguinte (ex.: `kyc`) arbitre. Veja [`02-conceitos-e-modelo-de-dados.md`](02-conceitos-e-modelo-de-dados.md).
+
 **Como remover um Flow que não uso mais?**
 `DELETE /flows/{id}` no Sequencer — é um soft delete (`status: "deleted"`), não afeta execuções já criadas a partir dele.
 
