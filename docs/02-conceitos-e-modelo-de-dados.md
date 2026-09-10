@@ -120,13 +120,20 @@ Cada item da lista `steps[]` de um Flow tem:
   >
   > Com `result_policy: "passthrough"`, uma reprovação no `verify` marca **o step** como `FAILED`, com o código de falha auditado normalmente (ex.: `verify_biometric_liveness_not_approved`), mas **a execução não é interrompida** e o step seguinte roda. Nesse modo, o template de rejeição do `verify` **não é enviado** no WhatsApp, justamente porque a jornada continua. **Omitir o campo mantém o comportamento atual**, sem nenhuma mudança: step e execução em `FAILED`.
   >
-  > O caso de uso é o fluxo que combina `verify` + `kyc`: sem o campo, a jornada morre na biometria antes de o motor de KYC avaliar qualquer coisa. Com `passthrough`, o KYC passa a ser o árbitro final. O campo é **genérico de propósito** — descreve o que fazer com o resultado, não qual módulo vem depois —, então vale para qualquer step seguinte, não só `kyc`. Os dois exemplos do contrato que o trazem são `kyc_biometric_behavior` e `kyc_form_biometric_behavior`.
+  >   O caso de uso é o fluxo que combina `verify` + `kyc`: sem o campo, a jornada morre na biometria antes de o motor de KYC avaliar qualquer coisa. Com `passthrough`, o KYC passa a ser o árbitro final. O campo é **genérico de propósito** — descreve o que fazer com o resultado, não qual módulo vem depois —, então vale para qualquer step seguinte, não só `kyc`. Os dois exemplos do contrato que o trazem são `kyc_biometric_behavior` e `kyc_form_biometric_behavior`.
   ```json
   { "type": "verify", "context": {
     "authentication": "biometric_behavior",
     "result_policy": "passthrough"
   } }
   ```
+
+  > **`instructions` — tela de instruções prévias à captura** *(novo, 10/09/2026 — AVL-4106)*. Campo **opcional, booleano**. Controla se o módulo Verify exibe ao consumidor final uma tela com as instruções da captura antes de abrir a câmera. Antes desta história, essa sinalização era fixa em código no Runner, igual para toda conta e todo Flow; agora é declarável por step. **Omitir o campo preserva o comportamento atual** (mesmo valor que o Runner já enviava por baixo). O Flow não desenha, escreve nem customiza a tela — conteúdo e layout são do módulo Verify. Ainda não confirmado se o parâmetro tem efeito em `channel: api` (onde quem renderiza a tela é o próprio integrador).
+  >
+  > ```json
+  > { "type": "verify", "context": { "authentication": "liveness", "instructions": true } }
+  > ```
+
 - **`kyc`** *(novo, 13/07/2026)*: `context = { type }`, com `type: "business"` (CNPJ) ou `"customer"` (CPF). Tipicamente encadeado logo após um `verify`, usando os dados já coletados (do `contact` da execução ou de um `form`/`verify` anterior) para rodar a checagem de conhecimento de cliente. Para que o KYC seja de fato o árbitro final — inclusive quando a biometria anterior reprova —, o `verify` que o precede precisa declarar `result_policy: "passthrough"`; sem isso a execução termina na reprovação da biometria e o `kyc` nunca roda.
   ```json
   { "type": "kyc", "context": { "type": "customer" } }
