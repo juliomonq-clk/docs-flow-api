@@ -18,7 +18,7 @@ Content-Type: application/json
   "steps": [
     { "type": "form", "context": { "version_key": "<version_key do formulário ClickForm>" } },
     { "type": "verify", "context": { "authentication": "liveness" } },
-    { "type": "signature", "context": { "documents": [ { "kind": "template", "template_key": "<uuid do modelo Távola>", "filename": "contrato.docx" } ], "settings": { "folder_key": "<referência da pasta>" } } }
+    { "type": "signature", "context": { "documents": [ { "kind": "template", "template_key": "<uuid do modelo da API v3>", "filename": "contrato.docx" } ], "settings": { "folder_key": "<referência da pasta>" } } }
   ]
 }
 ```
@@ -94,7 +94,7 @@ Content-Type: application/json
 
 O `files[].key` casa com o `documents[].key` do slot declarado no step `signature` do Flow; o nome do arquivo vem do `filename` do Flow, não do disparo. `content_base_64` é a **data-URL completa** (com o `data:<mime>;base64,` na frente), não o base64 cru. Campo opcional e aditivo — omitir mantém o comportamento anterior. Detalhe do modelo em [`02-conceitos-e-modelo-de-dados.md`](02-conceitos-e-modelo-de-dados.md).
 
-> Se o Flow tiver um step `signature`, o avanço para o próximo passo não é automático no `next`: ele depende do Runner receber o webhook de assinatura do Tavola (`POST /webhooks/signature`) confirmando o evento `sign`. Isso é interno ao Runner — a empresa integradora não precisa configurar nada, mas explica por que uma execução pode ficar em `waiting`/`running` até a assinatura ser concluída no Tavola.
+> Se o Flow tiver um step `signature`, o avanço para o próximo passo não é automático no `next`: ele depende do Runner receber o webhook de assinatura da API v3 (`POST /webhooks/signature`) confirmando o evento `sign`. Isso é interno ao Runner — a empresa integradora não precisa configurar nada, mas explica por que uma execução pode ficar em `waiting`/`running` até a assinatura ser concluída na API v3.
 
 ## 4. Acompanhar o progresso
 
@@ -145,7 +145,7 @@ Quatro pontos que evitam erro de integração:
 - **É irreversível.** Não existe retomar a mesma execução: para continuar, dispare uma nova. Depois do cancelamento,  responde `409`.
 - **É idempotente.** Cancelar de novo uma execução já cancelada devolve `200`, sem alterar estado e sem gerar novo registro de auditoria — reenvio por timeout é seguro.
 - **`409 Conflict`** só acontece quando a execução já está em **outro** estado terminal (`completed`/`failed`).
-- **Não propaga para fora da esteira.** Se o step de assinatura já criou o envelope no Távola, ele **continua ativo e assinável** — cancelá-lo é ação à parte. Os dados já coletados seguem consultáveis por `GET /executions/{execution_id}/steps`.
+- **Não propaga para fora da esteira.** Se o step de assinatura já criou o envelope na API v3, ele **continua ativo e assinável** — cancelá-lo é ação à parte. Os dados já coletados seguem consultáveis por `GET /executions/{execution_id}/steps`.
 
 Se o Flow em si não for mais necessário (ex: substituído por uma nova versão), remova-o:
 

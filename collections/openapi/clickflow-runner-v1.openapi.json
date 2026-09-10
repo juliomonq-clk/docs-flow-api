@@ -3,7 +3,7 @@
   "info": {
     "title": "ClickFlow Runner API",
     "version": "1.0",
-    "description": "### Visão geral\n\nO ClickFlow Runner inicia e acompanha execuções de fluxos conversacionais em nome de um contato. O fluxo é definido no orquestrador; o Runner executa cada etapa e persiste o estado para auditoria.\n\n### Como usar\n\n1. Iniciar uma execução — `POST /api/v1/flows/{flow_id}/execute`. Informe o contato (telefone, nome, etc.) e, opcionalmente, o `channel` (`whatsapp` padrão, ou `api` para modo headless).\n2. Acompanhar — `GET /api/v1/executions/{execution_id}`. Consulte o status da execução e de cada etapa.\n\n### Canal `api` (headless)\n\nConfirmado no contrato publicado em 13/07/2026. Com `channel: \"api\"`, o Runner não envia mensagens automáticas via WhatsApp (exceto para steps `acceptance`, que continuam exigindo WhatsApp) — a resposta traz `current_step.url`, e a empresa integradora é responsável por entregar o link ao contato.\n\n### Webhook de assinatura\n\n`POST /api/v1/webhooks/signature` recebe callbacks do Tavola para avançar steps de assinatura.\n\n### Autenticação\n\nTodas as rotas exigem o header `Authorization` com o UUID do token (sem prefixo `Bearer`).\n\n---\nConvertido a partir do spec Swagger 2.0 extraído do endpoint de documentação viva do serviço (`/api/v1/docs/doc.json`) em 13/07/2026 (revisão anterior: 07/07/2026). `servers` abaixo foram adicionados por este repositório.",
+    "description": "### Visão geral\n\nO ClickFlow Runner inicia e acompanha execuções de fluxos conversacionais em nome de um contato. O fluxo é definido no orquestrador; o Runner executa cada etapa e persiste o estado para auditoria.\n\n### Como usar\n\n1. Iniciar uma execução — `POST /api/v1/flows/{flow_id}/execute`. Informe o contato (telefone, nome, etc.) e, opcionalmente, o `channel` (`whatsapp` padrão, ou `api` para modo headless).\n2. Acompanhar — `GET /api/v1/executions/{execution_id}`. Consulte o status da execução e de cada etapa.\n\n### Canal `api` (headless)\n\nConfirmado no contrato publicado em 13/07/2026. Com `channel: \"api\"`, o Runner não envia mensagens automáticas via WhatsApp (exceto para steps `acceptance`, que continuam exigindo WhatsApp) — a resposta traz `current_step.url`, e a empresa integradora é responsável por entregar o link ao contato.\n\n### Webhook de assinatura\n\n`POST /api/v1/webhooks/signature` recebe callbacks da API v3 para avançar steps de assinatura.\n\n### Autenticação\n\nTodas as rotas exigem o header `Authorization` com o UUID do token (sem prefixo `Bearer`).\n\n---\nConvertido a partir do spec Swagger 2.0 extraído do endpoint de documentação viva do serviço (`/api/v1/docs/doc.json`) em 13/07/2026 (revisão anterior: 07/07/2026). `servers` abaixo foram adicionados por este repositório.",
     "contact": { "name": "Clicksign — ClickFlow" }
   },
   "servers": [
@@ -47,8 +47,8 @@
     "/webhooks/signature": {
       "post": {
         "tags": ["webhooks"],
-        "summary": "Webhook de assinatura (Tavola)",
-        "description": "Recebe callbacks de assinatura do Tavola. Eventos diferentes de \"sign\" e signer_key sem step correspondente (documento fora do flow) retornam 200 para evitar retries.",
+        "summary": "Webhook de assinatura (API v3)",
+        "description": "Recebe callbacks de assinatura da API v3. Eventos diferentes de \"sign\" e signer_key sem step correspondente (documento fora do flow) retornam 200 para evitar retries.",
         "security": [],
         "parameters": [
           { "name": "Content-Hmac", "in": "header", "description": "Assinatura HMAC no formato SHA256=<hex> (obrigatória apenas para eventos sign com signer_key pertencente a um step)", "schema": { "type": "string" } }

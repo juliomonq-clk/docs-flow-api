@@ -94,7 +94,7 @@
       ],
       "body": {
         "mimeType": "application/json",
-        "text": "{\n  \"name\": \"Onboarding de colaborador\",\n  \"steps\": [\n    { \"type\": \"form\", \"context\": { \"version_key\": \"<version_key do formulário>\" } },\n    { \"type\": \"verify\", \"context\": { \"authentication\": \"liveness\" } },\n    { \"type\": \"signature\", \"context\": { \"documents\": [ { \"kind\": \"template\", \"template_key\": \"<uuid do modelo Távola>\", \"filename\": \"contrato.docx\" } ], \"settings\": { \"folder_key\": \"<referência da pasta>\" } } }\n  ]\n}"
+        "text": "{\n  \"name\": \"Onboarding de colaborador\",\n  \"steps\": [\n    { \"type\": \"form\", \"context\": { \"version_key\": \"<version_key do formulário>\" } },\n    { \"type\": \"verify\", \"context\": { \"authentication\": \"liveness\" } },\n    { \"type\": \"signature\", \"context\": { \"documents\": [ { \"kind\": \"template\", \"template_key\": \"<uuid do modelo da API v3>\", \"filename\": \"contrato.docx\" } ], \"settings\": { \"folder_key\": \"<referência da pasta>\" } } }\n  ]\n}"
       }
     },
     {
@@ -230,7 +230,7 @@
       "_id": "req_webhook_signature",
       "_type": "request",
       "parentId": "fld_runner_webhooks",
-      "name": "Webhook de assinatura (Tavola)",
+      "name": "Webhook de assinatura (API v3)",
       "method": "POST",
       "url": "{{ _.runner_base_url }}/webhooks/signature",
       "headers": [

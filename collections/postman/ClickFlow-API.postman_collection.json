@@ -31,7 +31,7 @@
             "header": [ { "key": "Content-Type", "value": "application/json" } ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Onboarding de colaborador\",\n  \"steps\": [\n    { \"type\": \"form\", \"context\": { \"version_key\": \"<version_key do formulário>\" } },\n    { \"type\": \"verify\", \"context\": { \"authentication\": \"liveness\" } },\n    { \"type\": \"signature\", \"context\": { \"documents\": [ { \"kind\": \"template\", \"template_key\": \"<uuid do modelo Távola>\", \"filename\": \"contrato.docx\" } ], \"settings\": { \"folder_key\": \"<referência da pasta>\" } } }\n  ]\n}"
+              "raw": "{\n  \"name\": \"Onboarding de colaborador\",\n  \"steps\": [\n    { \"type\": \"form\", \"context\": { \"version_key\": \"<version_key do formulário>\" } },\n    { \"type\": \"verify\", \"context\": { \"authentication\": \"liveness\" } },\n    { \"type\": \"signature\", \"context\": { \"documents\": [ { \"kind\": \"template\", \"template_key\": \"<uuid do modelo da API v3>\", \"filename\": \"contrato.docx\" } ], \"settings\": { \"folder_key\": \"<referência da pasta>\" } } }\n  ]\n}"
             },
             "url": { "raw": "{{sequencer_base_url}}/flows", "host": ["{{sequencer_base_url}}"], "path": ["flows"] }
           }
@@ -166,7 +166,7 @@
       "name": "Runner — Webhooks",
       "item": [
         {
-          "name": "Webhook de assinatura (Tavola)",
+          "name": "Webhook de assinatura (API v3)",
           "request": {
             "method": "POST",
             "header": [
@@ -179,7 +179,7 @@
               "raw": "{\n  \"event\": {\n    \"name\": \"sign\",\n    \"data\": {\n      \"signer\": {\n        \"key\": \"<signer_key>\",\n        \"phone_number\": \"+5511999999999\"\n      }\n    }\n  },\n  \"document\": {\n    \"key\": \"<document_key>\"\n  }\n}"
             },
             "url": { "raw": "{{runner_base_url}}/webhooks/signature", "host": ["{{runner_base_url}}"], "path": ["webhooks", "signature"] },
-            "description": "Endpoint inbound chamado pelo Tavola — mantido aqui como referência do payload, não faz parte do fluxo normal de uma empresa integradora. Sempre responde 200 (processed/ignored); 401 indica HMAC inválido."
+            "description": "Endpoint inbound chamado pela API v3 — mantido aqui como referência do payload, não faz parte do fluxo normal de uma empresa integradora. Sempre responde 200 (processed/ignored); 401 indica HMAC inválido."
           }
         }
       ]
